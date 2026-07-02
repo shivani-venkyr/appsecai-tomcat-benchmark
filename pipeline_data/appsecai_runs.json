@@ -14,6 +14,12 @@
     "submitted_to_appsecai": true,
     "runs": [
       {
+        "pr_created": "#6",
+        "date": "2026-06-18",
+        "system_version": "1.0.9",
+        "triage_result": null
+      },
+      {
         "pr_created": "#20",
         "date": "2026-06-29",
         "system_version": "1.0.9",
@@ -26,6 +32,12 @@
     "runs": [
       {
         "pr_created": "#1",
+        "date": "2026-06-18",
+        "system_version": "1.0.9",
+        "triage_result": null
+      },
+      {
+        "pr_created": null,
         "date": "2026-06-29",
         "system_version": "1.0.9",
         "triage_result": null
