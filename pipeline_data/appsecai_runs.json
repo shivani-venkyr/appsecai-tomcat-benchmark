@@ -13,7 +13,7 @@
   },
   "CVE-2023-41080": {
     "submitted_to_appsecai": true,
-    "pr_created": null,
+    "pr_created": "#1",
     "triage_result": null,
     "date_run": "2026-06-29"
   },
