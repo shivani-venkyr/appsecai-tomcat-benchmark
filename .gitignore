@@ -3,5 +3,8 @@
 .DS_Store
 __pycache__/
 *.pyc
+.pytest_cache/
 .claude/
 outputs/
+html_generator.py
+claude-oasis-api-skill.md
