@@ -1,176 +1,321 @@
 {
   "CVE-2023-28709": {
     "submitted_to_appsecai": true,
-    "pr_created": "#13",
-    "triage_result": null,
-    "date_run": "2026-06-29"
+    "runs": [
+      {
+        "pr_created": "#13",
+        "date": "2026-06-29",
+        "system_version": "1.0.9",
+        "triage_result": null
+      }
+    ]
   },
   "CVE-2023-34981": {
     "submitted_to_appsecai": true,
-    "pr_created": "#20",
-    "triage_result": null,
-    "date_run": "2026-06-29"
+    "runs": [
+      {
+        "pr_created": "#20",
+        "date": "2026-06-29",
+        "system_version": "1.0.9",
+        "triage_result": null
+      }
+    ]
   },
   "CVE-2023-41080": {
     "submitted_to_appsecai": true,
-    "pr_created": "#1",
-    "triage_result": null,
-    "date_run": "2026-06-29"
+    "runs": [
+      {
+        "pr_created": "#1",
+        "date": "2026-06-29",
+        "system_version": "1.0.9",
+        "triage_result": null
+      }
+    ]
   },
   "CVE-2023-45648": {
     "submitted_to_appsecai": true,
-    "pr_created": "#17",
-    "triage_result": null,
-    "date_run": "2026-06-29"
+    "runs": [
+      {
+        "pr_created": "#17",
+        "date": "2026-06-29",
+        "system_version": "1.0.9",
+        "triage_result": null
+      }
+    ]
   },
   "CVE-2024-24549": {
     "submitted_to_appsecai": true,
-    "pr_created": "#19",
-    "triage_result": null,
-    "date_run": "2026-06-29"
+    "runs": [
+      {
+        "pr_created": "#19",
+        "date": "2026-06-29",
+        "system_version": "1.0.9",
+        "triage_result": null
+      }
+    ]
   },
   "CVE-2024-38286": {
     "submitted_to_appsecai": true,
-    "pr_created": null,
-    "triage_result": null,
-    "date_run": "2026-06-29"
+    "runs": [
+      {
+        "pr_created": null,
+        "date": "2026-06-29",
+        "system_version": "1.0.9",
+        "triage_result": null
+      }
+    ]
   },
   "CVE-2024-52316": {
     "submitted_to_appsecai": true,
-    "pr_created": "#12",
-    "triage_result": null,
-    "date_run": "2026-06-29"
+    "runs": [
+      {
+        "pr_created": "#12",
+        "date": "2026-06-29",
+        "system_version": "1.0.9",
+        "triage_result": null
+      }
+    ]
   },
   "CVE-2024-52317": {
     "submitted_to_appsecai": true,
-    "pr_created": "#15",
-    "triage_result": null,
-    "date_run": "2026-06-29"
+    "runs": [
+      {
+        "pr_created": "#15",
+        "date": "2026-06-29",
+        "system_version": "1.0.9",
+        "triage_result": null
+      }
+    ]
   },
   "CVE-2024-52318": {
     "submitted_to_appsecai": true,
-    "pr_created": "#24",
-    "triage_result": null,
-    "date_run": "2026-07-01"
+    "runs": [
+      {
+        "pr_created": "#24",
+        "date": "2026-07-01",
+        "system_version": "1.0.9",
+        "triage_result": null
+      }
+    ]
   },
   "CVE-2024-54677": {
     "submitted_to_appsecai": true,
-    "pr_created": "#10",
-    "triage_result": null,
-    "date_run": "2026-06-29"
+    "runs": [
+      {
+        "pr_created": "#10",
+        "date": "2026-06-29",
+        "system_version": "1.0.9",
+        "triage_result": null
+      }
+    ]
   },
   "CVE-2025-24813": {
     "submitted_to_appsecai": true,
-    "pr_created": "#18",
-    "triage_result": null,
-    "date_run": "2026-06-29"
+    "runs": [
+      {
+        "pr_created": "#18",
+        "date": "2026-06-29",
+        "system_version": "1.0.9",
+        "triage_result": null
+      }
+    ]
   },
   "CVE-2025-31650": {
     "submitted_to_appsecai": true,
-    "pr_created": "#19",
-    "triage_result": null,
-    "date_run": "2026-06-29"
+    "runs": [
+      {
+        "pr_created": "#19",
+        "date": "2026-06-29",
+        "system_version": "1.0.9",
+        "triage_result": null
+      }
+    ]
   },
   "CVE-2025-48988": {
     "submitted_to_appsecai": true,
-    "pr_created": "#28",
-    "triage_result": null,
-    "date_run": "2026-07-01"
+    "runs": [
+      {
+        "pr_created": "#28",
+        "date": "2026-07-01",
+        "system_version": "1.0.9",
+        "triage_result": null
+      }
+    ]
   },
   "CVE-2025-48989": {
     "submitted_to_appsecai": true,
-    "pr_created": null,
-    "triage_result": null,
-    "date_run": "2026-06-29"
+    "runs": [
+      {
+        "pr_created": null,
+        "date": "2026-06-29",
+        "system_version": "1.0.9",
+        "triage_result": null
+      }
+    ]
   },
   "CVE-2025-52520": {
     "submitted_to_appsecai": true,
-    "pr_created": "#28",
-    "triage_result": null,
-    "date_run": "2026-07-01"
+    "runs": [
+      {
+        "pr_created": "#28",
+        "date": "2026-07-01",
+        "system_version": "1.0.9",
+        "triage_result": null
+      }
+    ]
   },
   "CVE-2025-55668": {
     "submitted_to_appsecai": true,
-    "pr_created": "#26",
-    "triage_result": null,
-    "date_run": "2026-07-01"
+    "runs": [
+      {
+        "pr_created": "#26",
+        "date": "2026-07-01",
+        "system_version": "1.0.9",
+        "triage_result": null
+      }
+    ]
   },
   "CVE-2025-61795": {
     "submitted_to_appsecai": true,
-    "pr_created": "#16",
-    "triage_result": null,
-    "date_run": "2026-06-29"
+    "runs": [
+      {
+        "pr_created": "#16",
+        "date": "2026-06-29",
+        "system_version": "1.0.9",
+        "triage_result": null
+      }
+    ]
   },
   "CVE-2025-66614": {
     "submitted_to_appsecai": true,
-    "pr_created": "#21",
-    "triage_result": null,
-    "date_run": "2026-06-29"
+    "runs": [
+      {
+        "pr_created": "#21",
+        "date": "2026-06-29",
+        "system_version": "1.0.9",
+        "triage_result": null
+      }
+    ]
   },
   "CVE-2026-24733": {
     "submitted_to_appsecai": true,
-    "pr_created": "#27",
-    "triage_result": null,
-    "date_run": "2026-07-01"
+    "runs": [
+      {
+        "pr_created": "#27",
+        "date": "2026-07-01",
+        "system_version": "1.0.9",
+        "triage_result": null
+      }
+    ]
   },
   "CVE-2026-24880": {
     "submitted_to_appsecai": true,
-    "pr_created": "#17",
-    "triage_result": null,
-    "date_run": "2026-06-29"
+    "runs": [
+      {
+        "pr_created": "#17",
+        "date": "2026-06-29",
+        "system_version": "1.0.9",
+        "triage_result": null
+      }
+    ]
   },
   "CVE-2026-25854": {
     "submitted_to_appsecai": true,
-    "pr_created": "#23",
-    "triage_result": null,
-    "date_run": "2026-07-01"
+    "runs": [
+      {
+        "pr_created": "#23",
+        "date": "2026-07-01",
+        "system_version": "1.0.9",
+        "triage_result": null
+      }
+    ]
   },
   "CVE-2026-29129": {
     "submitted_to_appsecai": true,
-    "pr_created": null,
-    "triage_result": null,
-    "date_run": "2026-06-29"
+    "runs": [
+      {
+        "pr_created": null,
+        "date": "2026-06-29",
+        "system_version": "1.0.9",
+        "triage_result": null
+      }
+    ]
   },
   "CVE-2026-29145": {
     "submitted_to_appsecai": true,
-    "pr_created": "#25",
-    "triage_result": null,
-    "date_run": "2026-07-01"
+    "runs": [
+      {
+        "pr_created": "#25",
+        "date": "2026-07-01",
+        "system_version": "1.0.9",
+        "triage_result": null
+      }
+    ]
   },
   "CVE-2026-29146": {
     "submitted_to_appsecai": true,
-    "pr_created": "#11",
-    "triage_result": null,
-    "date_run": "2026-06-29"
+    "runs": [
+      {
+        "pr_created": "#11",
+        "date": "2026-06-29",
+        "system_version": "1.0.9",
+        "triage_result": null
+      }
+    ]
   },
   "CVE-2026-34483": {
     "submitted_to_appsecai": true,
-    "pr_created": "#14",
-    "triage_result": null,
-    "date_run": "2026-06-29"
+    "runs": [
+      {
+        "pr_created": "#14",
+        "date": "2026-06-29",
+        "system_version": "1.0.9",
+        "triage_result": null
+      }
+    ]
   },
   "CVE-2026-34487": {
     "submitted_to_appsecai": true,
-    "pr_created": "#9",
-    "triage_result": null,
-    "date_run": "2026-06-29"
+    "runs": [
+      {
+        "pr_created": "#9",
+        "date": "2026-06-29",
+        "system_version": "1.0.9",
+        "triage_result": null
+      }
+    ]
   },
   "CVE-2026-41284": {
     "submitted_to_appsecai": true,
-    "pr_created": null,
-    "triage_result": null,
-    "date_run": "2026-06-29"
+    "runs": [
+      {
+        "pr_created": null,
+        "date": "2026-06-29",
+        "system_version": "1.0.9",
+        "triage_result": null
+      }
+    ]
   },
   "CVE-2026-43513": {
     "submitted_to_appsecai": true,
-    "pr_created": "#22",
-    "triage_result": null,
-    "date_run": "2026-06-29"
+    "runs": [
+      {
+        "pr_created": "#22",
+        "date": "2026-06-29",
+        "system_version": "1.0.9",
+        "triage_result": null
+      }
+    ]
   },
   "CVE-2026-43514": {
     "submitted_to_appsecai": true,
-    "pr_created": "#20",
-    "triage_result": null,
-    "date_run": "2026-06-29"
+    "runs": [
+      {
+        "pr_created": "#20",
+        "date": "2026-06-29",
+        "system_version": "1.0.9",
+        "triage_result": null
+      }
+    ]
   }
 }

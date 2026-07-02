@@ -19,6 +19,13 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Capture AppSecAI system version
+        id: version
+        run: |
+          VERSION=$(curl -s https://api.cloud.appsecai.io/api/health/version | python3 -c "import sys,json; print(json.load(sys.stdin)['version'])")
+          echo "system_version=$VERSION" >> $GITHUB_OUTPUT
+          echo "AppSecAI system version: $VERSION"
+
       - name: Generate pending SARIF file list
         id: generate-list
         run: |
@@ -64,17 +71,24 @@ jobs:
 
           submitted = os.environ['PENDING_CVES'].split(',')
           today = date.today().isoformat()
+          system_version = os.environ['SYSTEM_VERSION']
 
           for cve in submitted:
               if cve in runs:
                   runs[cve]['submitted_to_appsecai'] = True
-                  runs[cve]['date_run'] = today
+                  runs[cve]['runs'].append({
+                      'pr_created': None,
+                      'date': today,
+                      'system_version': system_version,
+                      'triage_result': None
+                  })
 
           runs_path.write_text(json.dumps(runs, indent=2) + '\n')
-          print(f"Marked {len(submitted)} CVEs as submitted on {today}: {submitted}")
+          print(f"Marked {len(submitted)} CVEs as submitted on {today} (v{system_version}): {submitted}")
           PYEOF
         env:
           PENDING_CVES: ${{ steps.generate-list.outputs.pending_cves }}
+          SYSTEM_VERSION: ${{ steps.version.outputs.system_version }}
 
       - name: Commit updated runs log
         if: success() && steps.generate-list.outputs.pending_cves != ''
