@@ -2,6 +2,11 @@ name: AppSecAI Security Analysis
 
 on:
   workflow_dispatch:
+    inputs:
+      cve_id:
+        description: 'CVE to run (e.g. CVE-2023-28709). Leave blank to run all unsubmitted CVEs.'
+        required: false
+        default: ''
 
 permissions:
   contents: write
@@ -13,53 +18,153 @@ jobs:
     env:
       PROCESSING_MODE: group_cc
       AUTO_CREATE_PRS: 'true'
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Python dependencies
+        run: pip install anthropic
+
+      - name: Install council of experts
+        # Requires COUNCIL_TOKEN secret (PAT with access to AppSecureAI/DevDocs)
+        # and OPENAI_API_KEY secret for the Codex expert
+        if: secrets.COUNCIL_TOKEN != ''
+        run: |
+          pip install "git+https://${{ secrets.COUNCIL_TOKEN }}@github.com/AppSecureAI/DevDocs.git#subdirectory=tools/council-of-experts"
+        continue-on-error: true
+
       - name: Capture AppSecAI system version
         id: version
         run: |
-          VERSION=$(curl -s https://api.cloud.appsecai.io/api/health/version | python3 -c "import sys,json; print(json.load(sys.stdin)['version'])")
+          VERSION=$(curl -s https://api.cloud.appsecai.io/api/health/version \
+            | python3 -c "import sys,json; print(json.load(sys.stdin)['version'])" 2>/dev/null || echo "unknown")
           echo "system_version=$VERSION" >> $GITHUB_OUTPUT
           echo "AppSecAI system version: $VERSION"
 
-      - name: Generate pending SARIF file list
-        id: generate-list
+      - name: Determine CVEs to process
+        id: resolve-cves
+        env:
+          CVE_INPUT: ${{ inputs.cve_id }}
         run: |
           python3 - <<'PYEOF'
           import json, os
           from pathlib import Path
 
           runs = json.loads(Path('pipeline_data/appsecai_runs.json').read_text())
-          pending = [
-              f"sarif/{cve}.sarif"
-              for cve, v in runs.items()
-              if not v['submitted_to_appsecai']
-          ]
+          cve_id = os.environ.get('CVE_INPUT', '').strip()
 
-          if not pending:
-              print("No pending CVEs — nothing to submit.")
+          if cve_id:
+              cves = [cve_id]
+          else:
+              cves = [cve for cve, v in runs.items() if not v.get('submitted_to_appsecai')]
+
+          if not cves:
+              print("No CVEs to process.")
+          else:
+              print(f"CVEs to process ({len(cves)}): {cves}")
 
           with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
-              f.write("sarif_files<<EOF\n")
-              f.write("\n".join(pending) + "\n")
-              f.write("EOF\n")
-              f.write(f"pending_cves={','.join(cve.split('/')[1].replace('.sarif','') for cve in pending)}\n")
-
-          print(f"Pending CVEs ({len(pending)}): {[p.split('/')[1].replace('.sarif','') for p in pending]}")
+              f.write(f"cve_list={','.join(cves)}\n")
+              f.write(f"has_cves={'true' if cves else 'false'}\n")
           PYEOF
 
+      - name: Generate fix markdowns via Claude
+        if: steps.resolve-cves.outputs.has_cves == 'true'
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          CVE_LIST: ${{ steps.resolve-cves.outputs.cve_list }}
+        run: |
+          for cve in $(echo "$CVE_LIST" | tr ',' ' '); do
+            md="fixes/${cve}_before_after.md"
+            if [ ! -f "$md" ]; then
+              echo "Generating markdown for $cve ..."
+              python scripts/generate_markdown.py \
+                --cve-id "$cve" \
+                --candidates pipeline_data/cve_candidates.json \
+                --fixes-dir fixes \
+                --tomcat-repo https://github.com/apache/tomcat.git
+            else
+              echo "Markdown already exists for $cve, skipping."
+            fi
+          done
+
+      - name: Generate SARIF files
+        if: steps.resolve-cves.outputs.has_cves == 'true'
+        run: |
+          python scripts/sarif_generator.py \
+            --fixes-dir fixes \
+            --sarif-dir sarif
+
+      - name: Build SARIF file list
+        id: sarif-list
+        if: steps.resolve-cves.outputs.has_cves == 'true'
+        env:
+          CVE_LIST: ${{ steps.resolve-cves.outputs.cve_list }}
+        run: |
+          FILES=$(echo "$CVE_LIST" | tr ',' '\n' | awk '{print "sarif/" $0 ".sarif"}' | tr '\n' ' ')
+          echo "sarif_files=$FILES" >> $GITHUB_OUTPUT
+          echo "SARIF files: $FILES"
+
       - name: AppSecAI Vulnerability Analysis
-        if: steps.generate-list.outputs.sarif_files != ''
+        if: steps.resolve-cves.outputs.has_cves == 'true'
         uses: AppSecureAI/automation-action@v1
         with:
-          files: ${{ steps.generate-list.outputs.sarif_files }}
+          files: ${{ steps.sarif-list.outputs.sarif_files }}
 
-      - name: Mark submitted CVEs in runs log
-        if: success() && steps.generate-list.outputs.pending_cves != ''
+      - name: Generate comparison markdowns
+        if: steps.resolve-cves.outputs.has_cves == 'true'
+        env:
+          CVE_LIST: ${{ steps.resolve-cves.outputs.cve_list }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for cve in $(echo "$CVE_LIST" | tr ',' ' '); do
+            python scripts/generate_comparison.py \
+              --cve-id "$cve" \
+              --repo "${{ github.repository }}" \
+              --fixes-dir fixes \
+              --comparisons-dir comparisons
+          done
+
+      - name: Run council of experts
+        if: steps.resolve-cves.outputs.has_cves == 'true'
+        env:
+          CVE_LIST: ${{ steps.resolve-cves.outputs.cve_list }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          which council || { echo "council not installed, skipping"; exit 0; }
+          for cve in $(echo "$CVE_LIST" | tr ',' ' '); do
+            python scripts/run_council.py "$cve"
+          done
+
+      - name: Organize benchmark data
+        if: steps.resolve-cves.outputs.has_cves == 'true'
+        env:
+          CVE_LIST: ${{ steps.resolve-cves.outputs.cve_list }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for cve in $(echo "$CVE_LIST" | tr ',' ' '); do
+            python scripts/organize_benchmark.py \
+              --cve-id "$cve" \
+              --fixes-dir fixes \
+              --candidates pipeline_data/cve_candidates.json \
+              --benchmark-dir benchmark \
+              --repo "${{ github.repository }}"
+          done
+
+      - name: Update runs log
+        if: success() && steps.resolve-cves.outputs.has_cves == 'true'
+        env:
+          CVE_LIST: ${{ steps.resolve-cves.outputs.cve_list }}
+          SYSTEM_VERSION: ${{ steps.version.outputs.system_version }}
         run: |
           python3 - <<'PYEOF'
           import json, os
@@ -69,35 +174,34 @@ jobs:
           runs_path = Path('pipeline_data/appsecai_runs.json')
           runs = json.loads(runs_path.read_text())
 
-          submitted = os.environ['PENDING_CVES'].split(',')
+          cves = [c for c in os.environ['CVE_LIST'].split(',') if c]
           today = date.today().isoformat()
           system_version = os.environ['SYSTEM_VERSION']
 
-          for cve in submitted:
-              if cve in runs:
-                  runs[cve]['submitted_to_appsecai'] = True
-                  runs[cve]['runs'].append({
-                      'pr_created': None,
-                      'date': today,
-                      'system_version': system_version,
-                      'triage_result': None
-                  })
+          for cve in cves:
+              if cve not in runs:
+                  runs[cve] = {'submitted_to_appsecai': False, 'runs': []}
+              runs[cve]['submitted_to_appsecai'] = True
+              runs[cve]['runs'].append({
+                  'pr_created': None,
+                  'date': today,
+                  'system_version': system_version,
+                  'triage_result': None,
+              })
 
           runs_path.write_text(json.dumps(runs, indent=2) + '\n')
-          print(f"Marked {len(submitted)} CVEs as submitted on {today} (v{system_version}): {submitted}")
+          print(f"Updated {len(cves)} CVE(s) on {today} (v{system_version})")
           PYEOF
-        env:
-          PENDING_CVES: ${{ steps.generate-list.outputs.pending_cves }}
-          SYSTEM_VERSION: ${{ steps.version.outputs.system_version }}
 
-      - name: Commit updated runs log
-        if: success() && steps.generate-list.outputs.pending_cves != ''
+      - name: Commit and push all generated files
+        if: success() && steps.resolve-cves.outputs.has_cves == 'true'
+        env:
+          CVE_LIST: ${{ steps.resolve-cves.outputs.cve_list }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add pipeline_data/appsecai_runs.json
-          git diff --cached --quiet || git commit -m "chore: mark $(echo $PENDING_CVES | tr ',' '\n' | wc -l | tr -d ' ') CVEs as submitted [skip ci]"
+          git add fixes/ sarif/ comparisons/ pipeline_data/ benchmark/
+          N=$(echo "$CVE_LIST" | tr ',' '\n' | wc -l | tr -d ' ')
+          git diff --cached --quiet || git commit -m "chore: pipeline run for ${N} CVE(s) [skip ci]"
           git pull --rebase origin main
           git push
-        env:
-          PENDING_CVES: ${{ steps.generate-list.outputs.pending_cves }}

@@ -234,7 +234,7 @@ def build_sarif(cve_data: dict, start_line: int, end_line: int, snippet_lines: l
 
 def main(fixes_dir: Path, sarif_dir: Path, tomcat_dir: Path) -> None:
     sarif_dir.mkdir(parents=True, exist_ok=True)
-    base_dir = Path(__file__).parent
+    base_dir = Path(__file__).parent.parent
 
     for md_path in sorted(fixes_dir.glob("CVE-*.md")):
         cve_data = parse_markdown(md_path)
