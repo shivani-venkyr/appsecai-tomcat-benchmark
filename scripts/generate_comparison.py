@@ -16,6 +16,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from list_pending_cves import list_pending_cves
+
 
 def parse_fix_markdown(md_path: Path) -> dict:
     data = {}
@@ -196,10 +198,7 @@ def main() -> None:
     if args.cve_id:
         cve_ids = [args.cve_id]
     else:
-        cve_ids = sorted(
-            p.name.replace("_before_after.md", "")
-            for p in args.fixes_dir.glob("CVE-*_before_after.md")
-        )
+        cve_ids = list_pending_cves(args.fixes_dir, args.benchmark_dir)
 
     print(f"Generating comparisons for {len(cve_ids)} CVE(s)...")
     count = sum(

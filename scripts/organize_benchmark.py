@@ -161,34 +161,7 @@ def main(cve_id: str, fixes_dir: Path, candidates_path: Path, benchmark_dir: Pat
     cve_dir.mkdir(parents=True, exist_ok=True)
     fixes_out_dir.mkdir(exist_ok=True)
 
-    # Write metadata.json — full schema, merged with any existing data.
-    # Fields from the fix markdown (re-parsed each run) override stale values;
-    # rich fields from migrate_to_benchmark (fix_commits, fix_year, etc.) are
-    # preserved from cve_candidates.json or from the existing file on disk.
-    meta_path = cve_dir / "metadata.json"
-    existing_meta = json.loads(meta_path.read_text(encoding="utf-8")) if meta_path.exists() else {}
-    metadata = {
-        **existing_meta,
-        # Re-parsed from markdown
-        "cve_id": cve_id,
-        "cwe": cwe,
-        "cwe_description": parsed.get("cwe_description", existing_meta.get("cwe_description", "")),
-        "severity": parsed.get("severity", ""),
-        "d1_score": parsed.get("d1_score", 0),
-        "affected_component": parsed.get("affected_component", ""),
-        # From cve_candidates.json (full rich fields, not just fix_commits[0])
-        "short_description": candidate.get("short_description", existing_meta.get("short_description", "")),
-        "fix_commits": candidate.get("fix_commits", existing_meta.get("fix_commits", [])),
-        "fix_year": candidate.get("fix_year", existing_meta.get("fix_year")),
-        "tomcat_version": version,
-        "also_tomcat_version": candidate.get("also_tomcat_version", existing_meta.get("also_tomcat_version", [])),
-        "submitted_to_appsecai": existing_meta.get("submitted_to_appsecai", False),
-    }
-    metadata.pop("fix_commit", None)  # remove old singular key if present from previous runs
-    meta_path.write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
-    print(f"Wrote {cve_dir}/metadata.json")
-
-    # Write human_fix.md — render all After blocks (fixes with multiple files)
+    # Write human_fix.md first — no dependency on PR lookup
     after_blocks = parsed.get("after_blocks", [])
     if not after_blocks:
         print(f"  WARNING: no After code blocks found in {md_path.name} — human_fix.md will be empty")
@@ -233,6 +206,34 @@ def main(cve_id: str, fixes_dir: Path, candidates_path: Path, benchmark_dir: Pat
         print(f"Wrote {fixes_out_dir}/pr_{pr_number}_verdict.json")
     else:
         print("No AppSecAI PR found — appsec_fixes/ left empty")
+
+    # Write metadata.json after PR lookup so pr_found reflects the actual outcome.
+    # Fields from the fix markdown override stale values; rich fields from
+    # cve_candidates.json or the existing file are preserved.
+    meta_path = cve_dir / "metadata.json"
+    existing_meta = json.loads(meta_path.read_text(encoding="utf-8")) if meta_path.exists() else {}
+    metadata = {
+        **existing_meta,
+        # Re-parsed from markdown
+        "cve_id": cve_id,
+        "cwe": cwe,
+        "cwe_description": parsed.get("cwe_description", existing_meta.get("cwe_description", "")),
+        "severity": parsed.get("severity", ""),
+        "d1_score": parsed.get("d1_score", 0),
+        "affected_component": parsed.get("affected_component", ""),
+        # From cve_candidates.json
+        "short_description": candidate.get("short_description", existing_meta.get("short_description", "")),
+        "fix_commits": candidate.get("fix_commits", existing_meta.get("fix_commits", [])),
+        "fix_year": candidate.get("fix_year", existing_meta.get("fix_year")),
+        "tomcat_version": version,
+        "also_tomcat_version": candidate.get("also_tomcat_version", existing_meta.get("also_tomcat_version", [])),
+        # Track pipeline state — used by list_pending_cves to detect incomplete entries
+        "submitted_to_appsecai": True,  # always True: organize_benchmark runs after the AppSecAI action
+        "pr_found": pr is not None,
+    }
+    metadata.pop("fix_commit", None)  # remove old singular key if present from previous runs
+    meta_path.write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
+    print(f"Wrote {cve_dir}/metadata.json")
 
 
 if __name__ == "__main__":

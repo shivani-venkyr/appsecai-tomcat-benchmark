@@ -59,10 +59,14 @@ jobs:
           CVE_INPUT: ${{ inputs.cve_id }}
         run: |
           python3 - <<'PYEOF'
+          import json
           import os
           import re
           import sys
           from pathlib import Path
+
+          sys.path.insert(0, 'scripts')
+          from list_pending_cves import list_pending_cves
 
           CVE_RE = re.compile(r'^CVE-\d{4}-\d+$')
           cve_id = os.environ.get('CVE_INPUT', '').strip()
@@ -71,14 +75,18 @@ jobs:
               if not CVE_RE.match(cve_id):
                   print(f"ERROR: invalid CVE ID format: {cve_id!r}", file=sys.stderr)
                   sys.exit(1)
-              submitted = {p.parent.name for p in Path('benchmark').glob('*/CVE-*/metadata.json')}
-              if cve_id in submitted:
-                  print(f"WARNING: {cve_id} is already in benchmark/ — re-running may create a duplicate AppSecAI PR")
+              # Warn if this CVE already has a complete benchmark entry
+              for meta_path in Path('benchmark').glob('*/CVE-*/metadata.json'):
+                  if meta_path.parent.name == cve_id:
+                      try:
+                          meta = json.loads(meta_path.read_text())
+                          if meta.get('pr_found', True):
+                              print(f"WARNING: {cve_id} already has a complete benchmark entry — re-running may create a duplicate AppSecAI PR")
+                      except Exception:
+                          pass
               cves = [cve_id]
           else:
-              submitted = {p.parent.name for p in Path('benchmark').glob('*/CVE-*/metadata.json')}
-              has_fix = {p.name.replace('_before_after.md', '') for p in Path('fixes').glob('CVE-*_before_after.md')}
-              cves = sorted(has_fix - submitted)
+              cves = list_pending_cves(Path('fixes'), Path('benchmark'))
 
           if not cves:
               print("No CVEs to process.")

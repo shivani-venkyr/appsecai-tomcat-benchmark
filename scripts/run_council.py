@@ -10,13 +10,12 @@ Usage:
     python3 scripts/run_council.py CVE-2023-41080  # single CVE
 """
 
+import argparse
 import json
 import re
 import subprocess
 import sys
 from pathlib import Path
-
-BENCHMARK_DIR = Path("benchmark")
 
 PROMPT_TEMPLATE = """\
 You are evaluating an AI-generated security fix against the correct human fix for a real CVE in Apache Tomcat.
@@ -146,7 +145,11 @@ def update_verdict(cve_dir: Path, pr_num: int | None, council_result: dict, run_
 
 
 def process_file(path: Path) -> None:
-    meta, human_fix, ai_fixes = parse_comparison_file(path)
+    try:
+        meta, human_fix, ai_fixes = parse_comparison_file(path)
+    except ValueError as e:
+        print(f"ERROR: could not parse {path}: {e}")
+        return
     cve_dir = path.parent
 
     for fix in ai_fixes:
@@ -184,16 +187,22 @@ def process_file(path: Path) -> None:
 
 
 def main() -> None:
-    target = sys.argv[1] if len(sys.argv) > 1 else None
+    parser = argparse.ArgumentParser()
+    parser.add_argument("cve_id", nargs="?", default=None, help="Single CVE to process")
+    parser.add_argument("--benchmark-dir", type=Path, default=Path("benchmark"))
+    args = parser.parse_args()
+
+    benchmark_dir = args.benchmark_dir
+    target = args.cve_id
 
     if target:
-        files = sorted(BENCHMARK_DIR.glob(f"*/CVE-*/comparison.md"))
+        files = sorted(benchmark_dir.glob("*/CVE-*/comparison.md"))
         files = [f for f in files if target in str(f)]
         if not files:
-            print(f"No comparison.md found for {target} in benchmark/ — skipping")
+            print(f"No comparison.md found for {target} in {benchmark_dir}/ — skipping")
             sys.exit(0)
     else:
-        files = sorted(BENCHMARK_DIR.glob("*/CVE-*/comparison.md"))
+        files = sorted(benchmark_dir.glob("*/CVE-*/comparison.md"))
 
     print(f"Running council on {len(files)} CVE(s)...\n")
 

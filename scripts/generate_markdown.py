@@ -208,8 +208,14 @@ def main(
 
     DIFF_CAP = 24000
     if len(diff_text) > DIFF_CAP:
-        print(f"  WARNING: combined diff is {len(diff_text)} chars, truncating to {DIFF_CAP}")
-        diff_text = diff_text[:DIFF_CAP]
+        # Truncate at the last @@ hunk header before the cap so Claude doesn't
+        # receive a syntactically broken diff mid-hunk.
+        truncate_at = diff_text.rfind('\n@@', 0, DIFF_CAP)
+        if truncate_at == -1:
+            truncate_at = DIFF_CAP
+        original_len = len(diff_text)
+        diff_text = diff_text[:truncate_at] + "\n... (diff truncated)"
+        print(f"  WARNING: combined diff is {original_len} chars, truncated at hunk boundary ({truncate_at} chars)")
 
     prompt = PROMPT_TEMPLATE.format(
         cve_id=cve_id,
