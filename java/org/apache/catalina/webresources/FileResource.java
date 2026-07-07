@@ -29,10 +29,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.security.cert.Certificate;
-import java.util.concurrent.locks.Lock;
 import java.util.jar.Manifest;
 
-import org.apache.catalina.WebResourceLockSet;
 import org.apache.catalina.WebResourceRoot;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
@@ -64,40 +62,10 @@ public class FileResource extends AbstractResource {
     private final boolean readOnly;
     private final Manifest manifest;
     private final boolean needConvert;
-    private final WebResourceLockSet lockSet;
-    private final String lockPath;
 
-   /**
-     * Creates a FileResource without locking support.
-     *
-     * @param root The web resource root
-     * @param webAppPath The web application path
-     * @param resource The underlying file
-     * @param readOnly Whether the resource is read-only
-     * @param manifest The JAR manifest, or null if not applicable
-     */
     public FileResource(WebResourceRoot root, String webAppPath, File resource, boolean readOnly, Manifest manifest) {
-        this(root, webAppPath, resource, readOnly, manifest, null, null);
-    }
-
-
-    /**
-     * Creates a FileResource with optional locking support.
-     *
-     * @param root The web resource root
-     * @param webAppPath The web application path
-     * @param resource The underlying file
-     * @param readOnly Whether the resource is read-only
-     * @param manifest The JAR manifest, or null if not applicable
-     * @param lockSet The lock set for concurrent access control, or null if locking is not required
-     * @param lockPath The path used for locking, or null if locking is not required
-     */
-    public FileResource(WebResourceRoot root, String webAppPath, File resource, boolean readOnly, Manifest manifest,
-            WebResourceLockSet lockSet, String lockPath) {
         super(root, webAppPath);
         this.resource = resource;
-        this.lockSet = lockSet;
-        this.lockPath = lockPath;
 
         if (webAppPath.charAt(webAppPath.length() - 1) == '/') {
             String realName = resource.getName() + '/';
@@ -149,23 +117,7 @@ public class FileResource extends AbstractResource {
         if (readOnly) {
             return false;
         }
-        /*
-         * Lock the path for writing until the delete is complete. The lock prevents concurrent reads and writes (e.g.
-         * HTTP GET and PUT / DELETE) for the same path causing corruption of the FileResource where some of the fields
-         * are set as if the file exists and some as set as if it does not.
-         */
-        Lock writeLock = null;
-        if (lockSet != null) {
-            writeLock = lockSet.getLock(lockPath).writeLock();
-            writeLock.lock();
-        }
-        try {
-            return resource.delete();
-        } finally {
-            if (writeLock != null) {
-                writeLock.unlock();
-            }
-        }
+        return resource.delete();
     }
 
     @Override
@@ -237,10 +189,8 @@ public class FileResource extends AbstractResource {
 
         if (len > Integer.MAX_VALUE) {
             // Can't create an array that big
-            if (getLog().isDebugEnabled()) {
-                getLog().debug(sm.getString("abstractResource.getContentTooLarge", getWebappPath(), Long.valueOf(len)));
-            }
-            return null;
+            throw new ArrayIndexOutOfBoundsException(
+                    sm.getString("abstractResource.getContentTooLarge", getWebappPath(), Long.valueOf(len)));
         }
 
         if (len < 0) {
@@ -288,9 +238,9 @@ public class FileResource extends AbstractResource {
         try {
             BasicFileAttributes attrs = Files.readAttributes(resource.toPath(), BasicFileAttributes.class);
             return attrs.creationTime().toMillis();
-        } catch (IOException ioe) {
+        } catch (IOException e) {
             if (log.isDebugEnabled()) {
-                log.debug(sm.getString("fileResource.getCreationFail", resource.getPath()), ioe);
+                log.debug(sm.getString("fileResource.getCreationFail", resource.getPath()), e);
             }
             return 0;
         }
@@ -309,15 +259,6 @@ public class FileResource extends AbstractResource {
             }
         } else {
             return null;
-        }
-    }
-
-    @Override
-    public URL getCodeBase() {
-        if (getWebappPath().startsWith("/WEB-INF/classes/") && name.endsWith(".class")) {
-            return getWebResourceRoot().getResource("/WEB-INF/classes/").getURL();
-        } else {
-            return getURL();
         }
     }
 
