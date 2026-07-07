@@ -109,8 +109,13 @@ def run_council(prompt: str) -> dict:
     merged, status = _run_council(
         wrapped,
         experts=[ClaudeExpert(timeout=600), CodexExpert(timeout=600)],
-        log=lambda _: None,
+        log=print,
     )
+
+    if status.get("degraded"):
+        for name, outcome in status.get("experts", {}).items():
+            if outcome != "ok":
+                print(f"  WARNING: council expert '{name}' {outcome}")
 
     if merged is None:
         raise RuntimeError(f"All council experts failed: {status['experts']}")
