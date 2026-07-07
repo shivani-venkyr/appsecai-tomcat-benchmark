@@ -74,9 +74,9 @@ def find_appsecai_pr(cve_id: str, repo: str) -> dict | None:
         [
             "gh", "pr", "list",
             "--repo", repo,
-            "--state", "open",
+            "--state", "all",
             "--json", "number,url,headRefName,title,createdAt",
-            "--limit", "50",
+            "--limit", "100",
         ],
         capture_output=True, text=True,
     )
@@ -105,7 +105,7 @@ def fetch_pr_diff(pr_number: int, repo: str) -> str:
     return result.stdout if result.returncode == 0 else ""
 
 
-def main(cve_id: str, fixes_dir: Path, candidates_path: Path, benchmark_dir: Path, repo: str) -> None:
+def main(cve_id: str, fixes_dir: Path, candidates_path: Path, benchmark_dir: Path, repo: str, system_version: str | None = None) -> None:
     md_path = fixes_dir / f"{cve_id}_before_after.md"
     if not md_path.exists():
         print(f"ERROR: {md_path} not found", file=sys.stderr)
@@ -155,6 +155,7 @@ def main(cve_id: str, fixes_dir: Path, candidates_path: Path, benchmark_dir: Pat
             "pr_number": pr_number,
             "pr_url": pr["url"],
             "date": date.today().isoformat(),
+            "system_version": system_version,
             "status": "pr_created",
             "human_verdict": None,
         }
@@ -173,5 +174,6 @@ if __name__ == "__main__":
     parser.add_argument("--candidates", type=Path, default=Path("pipeline_data/cve_candidates.json"))
     parser.add_argument("--benchmark-dir", type=Path, default=Path("benchmark"))
     parser.add_argument("--repo", default="AppSecureAI/appsecai-tomcat-benchmark")
+    parser.add_argument("--system-version", default=None)
     args = parser.parse_args()
-    main(args.cve_id, args.fixes_dir, args.candidates, args.benchmark_dir, args.repo)
+    main(args.cve_id, args.fixes_dir, args.candidates, args.benchmark_dir, args.repo, args.system_version)

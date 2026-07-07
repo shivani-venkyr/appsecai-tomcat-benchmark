@@ -2,11 +2,11 @@
 Generate comparison markdown files for council-of-experts review.
 
 Reads fixes/CVE-*_before_after.md (human fix) and fetches the AppSecAI PR diff,
-then writes comparisons/CVE-*.md in the format expected by run_council.py.
+then writes benchmark/CWE-NNN/CVE-XXXX/comparison.md.
 
 Usage:
     python scripts/generate_comparison.py --cve-id CVE-XXXX-XXXXX
-    python scripts/generate_comparison.py          # all CVEs that have a fix but no comparison
+    python scripts/generate_comparison.py          # all CVEs with a fix but no comparison
 """
 
 import argparse
@@ -22,7 +22,6 @@ def parse_fix_markdown(md_path: Path) -> dict:
     after_lines = []
     after_file = ""
     state = "TABLE"
-
     with open(md_path, encoding="utf-8") as f:
         for line in f:
             line = line.rstrip("\n")
@@ -33,7 +32,9 @@ def parse_fix_markdown(md_path: Path) -> dict:
                     if field == "CVE ID":
                         data["cve_id"] = value
                     elif field == "CWE":
-                        data["cwe"] = value
+                        data["cwe_full"] = value
+                        cwe_m = re.search(r'CWE-\d+', value)
+                        data["cwe_id"] = cwe_m.group(0) if cwe_m else value
                     elif field == "Severity":
                         data["severity"] = value
                 elif line.startswith("## After"):
@@ -48,7 +49,6 @@ def parse_fix_markdown(md_path: Path) -> dict:
                 if line.strip() == "```":
                     break
                 after_lines.append(line)
-
     data["after_file"] = after_file
     data["after_lines"] = after_lines
     return data
@@ -93,17 +93,25 @@ def filter_java_diff(diff_text: str) -> str:
     return "\n".join(out)
 
 
-def process_cve(cve_id: str, fixes_dir: Path, comparisons_dir: Path, repo: str) -> bool:
+def find_cve_dir(cve_id: str, cwe_id: str, benchmark_dir: Path) -> Path:
+    cve_dir = benchmark_dir / cwe_id / cve_id
+    cve_dir.mkdir(parents=True, exist_ok=True)
+    return cve_dir
+
+
+def process_cve(cve_id: str, fixes_dir: Path, benchmark_dir: Path, repo: str) -> bool:
     md_path = fixes_dir / f"{cve_id}_before_after.md"
     if not md_path.exists():
         print(f"  {cve_id}: no fix markdown, skipping")
         return False
 
     data = parse_fix_markdown(md_path)
-    cwe = data.get("cwe", "CWE-UNKNOWN")
+    cwe_id = data.get("cwe_id", "CWE-UNKNOWN")
+    cwe_full = data.get("cwe_full", cwe_id)
     severity = data.get("severity", "Unknown")
     human_fix = "\n".join(data["after_lines"])
     after_file = data.get("after_file", "")
+    file_header = f"`{after_file}`\n\n" if after_file else ""
 
     pr = find_appsecai_pr(cve_id, repo)
     if not pr:
@@ -117,11 +125,11 @@ def process_cve(cve_id: str, fixes_dir: Path, comparisons_dir: Path, repo: str) 
         return False
 
     java_diff = filter_java_diff(diff)
-    file_header = f"`{after_file}`\n\n" if after_file else ""
+    cve_dir = find_cve_dir(cve_id, cwe_id, benchmark_dir)
 
     content = f"""# {cve_id} Fix Comparison
 
-**CVE:** {cve_id} | **CWE:** {cwe} | **Severity:** {severity} | **PR:** #{pr_number}
+**CVE:** {cve_id} | **CWE:** {cwe_full} | **Severity:** {severity} | **PR:** #{pr_number}
 
 ## Human Fix
 
@@ -135,19 +143,18 @@ def process_cve(cve_id: str, fixes_dir: Path, comparisons_dir: Path, repo: str) 
 {java_diff}
 ```
 """
-    comparisons_dir.mkdir(exist_ok=True)
-    out_path = comparisons_dir / f"{cve_id}.md"
+    out_path = cve_dir / "comparison.md"
     out_path.write_text(content, encoding="utf-8")
     print(f"  {cve_id}: wrote {out_path} (PR #{pr_number})")
     return True
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--cve-id", help="Single CVE to process")
     parser.add_argument("--repo", default="AppSecureAI/appsecai-tomcat-benchmark")
     parser.add_argument("--fixes-dir", type=Path, default=Path("fixes"))
-    parser.add_argument("--comparisons-dir", type=Path, default=Path("comparisons"))
+    parser.add_argument("--benchmark-dir", type=Path, default=Path("benchmark"))
     args = parser.parse_args()
 
     if args.cve_id:
@@ -156,13 +163,12 @@ def main():
         cve_ids = sorted(
             p.name.replace("_before_after.md", "")
             for p in args.fixes_dir.glob("CVE-*_before_after.md")
-            if not (args.comparisons_dir / (p.name.replace("_before_after.md", "") + ".md")).exists()
         )
 
     print(f"Generating comparisons for {len(cve_ids)} CVE(s)...")
     count = sum(
         1 for cve_id in cve_ids
-        if process_cve(cve_id, args.fixes_dir, args.comparisons_dir, args.repo)
+        if process_cve(cve_id, args.fixes_dir, args.benchmark_dir, args.repo)
     )
     print(f"Done. Wrote {count} comparison file(s).")
 

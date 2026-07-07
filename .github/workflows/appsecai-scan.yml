@@ -119,32 +119,6 @@ jobs:
         with:
           files: ${{ steps.sarif-list.outputs.sarif_files }}
 
-      - name: Generate comparison markdowns
-        if: steps.resolve-cves.outputs.has_cves == 'true'
-        env:
-          CVE_LIST: ${{ steps.resolve-cves.outputs.cve_list }}
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          for cve in $(echo "$CVE_LIST" | tr ',' ' '); do
-            python scripts/generate_comparison.py \
-              --cve-id "$cve" \
-              --repo "${{ github.repository }}" \
-              --fixes-dir fixes \
-              --comparisons-dir comparisons
-          done
-
-      - name: Run council of experts
-        if: steps.resolve-cves.outputs.has_cves == 'true'
-        env:
-          CVE_LIST: ${{ steps.resolve-cves.outputs.cve_list }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-        run: |
-          which council || { echo "council not installed, skipping"; exit 0; }
-          for cve in $(echo "$CVE_LIST" | tr ',' ' '); do
-            python scripts/run_council.py "$cve"
-          done
-
       - name: Organize benchmark data
         if: steps.resolve-cves.outputs.has_cves == 'true'
         env:
@@ -157,7 +131,34 @@ jobs:
               --fixes-dir fixes \
               --candidates pipeline_data/cve_candidates.json \
               --benchmark-dir benchmark \
-              --repo "${{ github.repository }}"
+              --repo "${{ github.repository }}" \
+              --system-version "${{ steps.version.outputs.system_version }}"
+          done
+
+      - name: Generate comparison markdowns
+        if: steps.resolve-cves.outputs.has_cves == 'true'
+        env:
+          CVE_LIST: ${{ steps.resolve-cves.outputs.cve_list }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for cve in $(echo "$CVE_LIST" | tr ',' ' '); do
+            python scripts/generate_comparison.py \
+              --cve-id "$cve" \
+              --repo "${{ github.repository }}" \
+              --fixes-dir fixes \
+              --benchmark-dir benchmark
+          done
+
+      - name: Run council of experts
+        if: steps.resolve-cves.outputs.has_cves == 'true'
+        env:
+          CVE_LIST: ${{ steps.resolve-cves.outputs.cve_list }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          which council || { echo "council not installed, skipping"; exit 0; }
+          for cve in $(echo "$CVE_LIST" | tr ',' ' '); do
+            python scripts/run_council.py "$cve"
           done
 
       - name: Update runs log
@@ -200,7 +201,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add fixes/ sarif/ comparisons/ pipeline_data/ benchmark/
+          git add fixes/ sarif/ pipeline_data/ benchmark/
           N=$(echo "$CVE_LIST" | tr ',' '\n' | wc -l | tr -d ' ')
           git diff --cached --quiet || git commit -m "chore: pipeline run for ${N} CVE(s) [skip ci]"
           git pull --rebase origin main
