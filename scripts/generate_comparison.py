@@ -44,9 +44,9 @@ def parse_fix_markdown(md_path: Path) -> dict:
                 stripped = line.strip()
                 if stripped.startswith("## ") and not stripped.startswith("## After"):
                     break  # left the After section
-                if stripped.startswith("`java/"):
+                if re.match(r'^`[^`]+\.java`$', stripped):
                     current_file = stripped.strip("`")
-                elif re.match(r'^```', stripped):
+                elif re.match(r'^```', stripped) and current_file:
                     current_lines = []
                     state = "IN_AFTER"
             elif state == "IN_AFTER":
@@ -70,6 +70,7 @@ def find_appsecai_pr(cve_id: str, repo: str, file_path: str | None = None) -> di
         capture_output=True, text=True,
     )
     if result.returncode != 0:
+        print(f"  WARNING: gh pr list failed: {result.stderr.strip()}")
         return None
     prs = json.loads(result.stdout)
     appsecai_prs = [p for p in prs if p["headRefName"].startswith("appsecai/fix-group/")]
@@ -153,6 +154,8 @@ def process_cve(cve_id: str, fixes_dir: Path, benchmark_dir: Path, repo: str) ->
 
     # Render all After blocks (handles fixes touching multiple files)
     after_blocks = data.get("after_blocks", [])
+    if not after_blocks:
+        print(f"  {cve_id}: WARNING — no After code blocks found; human fix section will be empty")
     if after_blocks:
         human_fix_parts = []
         for block in after_blocks:

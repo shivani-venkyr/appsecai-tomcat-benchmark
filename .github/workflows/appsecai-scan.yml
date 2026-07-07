@@ -113,10 +113,13 @@ jobs:
 
       - name: Generate SARIF files
         if: steps.resolve-cves.outputs.has_cves == 'true'
+        env:
+          CVE_LIST: ${{ steps.resolve-cves.outputs.cve_list }}
         run: |
           python scripts/sarif_generator.py \
             --fixes-dir fixes \
-            --sarif-dir sarif
+            --sarif-dir sarif \
+            --cve-ids "$CVE_LIST"
 
       - name: Build SARIF file list
         id: sarif-list
@@ -155,7 +158,8 @@ jobs:
               --candidates cve_candidates.json \
               --benchmark-dir benchmark \
               --repo "${{ github.repository }}" \
-              --system-version "${{ steps.version.outputs.system_version }}"
+              --system-version "${{ steps.version.outputs.system_version }}" \
+              || echo "WARNING: organize_benchmark failed for $cve, continuing"
           done
 
       - name: Generate comparison markdowns
@@ -170,7 +174,8 @@ jobs:
               --cve-id "$cve" \
               --repo "${{ github.repository }}" \
               --fixes-dir fixes \
-              --benchmark-dir benchmark
+              --benchmark-dir benchmark \
+              || echo "WARNING: generate_comparison failed for $cve, continuing"
           done
 
       - name: Run council of experts
@@ -183,7 +188,8 @@ jobs:
           which council || { echo "council not installed, skipping"; exit 0; }
           for cve in $(echo "$CVE_LIST" | tr ',' ' '); do
             [[ "$cve" =~ ^CVE-[0-9]{4}-[0-9]+$ ]] || { echo "Skipping invalid token: $cve"; continue; }
-            python scripts/run_council.py "$cve"
+            python scripts/run_council.py "$cve" \
+              || echo "WARNING: run_council failed for $cve, continuing"
           done
 
       - name: Commit and push all generated files
@@ -193,8 +199,9 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          git rebase origin/main
           git add fixes/ sarif/ benchmark/
           N=$(echo "$CVE_LIST" | tr ',' '\n' | wc -l | tr -d ' ')
           git diff --cached --quiet || git commit -m "chore: pipeline run for ${N} CVE(s) [skip ci]"
-          git pull --rebase origin main
           git push

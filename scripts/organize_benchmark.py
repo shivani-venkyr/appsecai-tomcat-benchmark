@@ -48,6 +48,8 @@ def parse_fix_markdown(md_path: Path) -> dict:
                     elif field == "CWE":
                         cwe_m = re.search(r'CWE-\d+', value)
                         data["cwe"] = cwe_m.group(0) if cwe_m else value
+                        desc_m = re.search(r'\((.+?)\)', value)
+                        data["cwe_description"] = desc_m.group(1) if desc_m else ""
                     elif field == "Severity":
                         data["severity"] = value
                     elif field == "D1 Score":
@@ -62,9 +64,11 @@ def parse_fix_markdown(md_path: Path) -> dict:
                 stripped = line.strip()
                 if stripped.startswith("## ") and not stripped.startswith("## After"):
                     break  # left the After section
-                if stripped.startswith("`java/"):
+                if re.match(r'^`[^`]+\.java`$', stripped):
                     current_file = stripped.strip("`")
-                elif re.match(r'^```', stripped):
+                elif re.match(r'^```', stripped) and current_file:
+                    # Only open a block when a file path preceded it; bare fences
+                    # without a file path are illustrative blocks, not fix code.
                     current_lines = []
                     state = "IN_AFTER"
 
@@ -96,6 +100,7 @@ def find_appsecai_pr(cve_id: str, repo: str, file_path: str | None = None) -> di
         capture_output=True, text=True,
     )
     if result.returncode != 0:
+        print(f"  WARNING: gh pr list failed: {result.stderr.strip()}")
         return None
 
     prs = json.loads(result.stdout)
@@ -144,7 +149,10 @@ def main(cve_id: str, fixes_dir: Path, candidates_path: Path, benchmark_dir: Pat
     cwe = parsed.get("cwe", "CWE-UNKNOWN")
 
     candidates = json.loads(candidates_path.read_text(encoding="utf-8"))
-    candidate = next((c for c in candidates if c["cve_id"] == cve_id), {})
+    candidate = next((c for c in candidates if c["cve_id"] == cve_id), None)
+    if candidate is None:
+        print(f"  WARNING: {cve_id} not found in {candidates_path} — candidate fields will be empty")
+        candidate = {}
     version = candidate.get("tomcat_version", "unknown")
 
     # Create folder structure
@@ -153,24 +161,37 @@ def main(cve_id: str, fixes_dir: Path, candidates_path: Path, benchmark_dir: Pat
     cve_dir.mkdir(parents=True, exist_ok=True)
     fixes_out_dir.mkdir(exist_ok=True)
 
-    # Write metadata.json — merge with existing to preserve rich fields from migration
+    # Write metadata.json — full schema, merged with any existing data.
+    # Fields from the fix markdown (re-parsed each run) override stale values;
+    # rich fields from migrate_to_benchmark (fix_commits, fix_year, etc.) are
+    # preserved from cve_candidates.json or from the existing file on disk.
     meta_path = cve_dir / "metadata.json"
     existing_meta = json.loads(meta_path.read_text(encoding="utf-8")) if meta_path.exists() else {}
     metadata = {
         **existing_meta,
+        # Re-parsed from markdown
         "cve_id": cve_id,
         "cwe": cwe,
+        "cwe_description": parsed.get("cwe_description", existing_meta.get("cwe_description", "")),
         "severity": parsed.get("severity", ""),
         "d1_score": parsed.get("d1_score", 0),
         "affected_component": parsed.get("affected_component", ""),
+        # From cve_candidates.json (full rich fields, not just fix_commits[0])
+        "short_description": candidate.get("short_description", existing_meta.get("short_description", "")),
+        "fix_commits": candidate.get("fix_commits", existing_meta.get("fix_commits", [])),
+        "fix_year": candidate.get("fix_year", existing_meta.get("fix_year")),
         "tomcat_version": version,
-        "fix_commit": candidate.get("fix_commits", [None])[0],
+        "also_tomcat_version": candidate.get("also_tomcat_version", existing_meta.get("also_tomcat_version", [])),
+        "submitted_to_appsecai": existing_meta.get("submitted_to_appsecai", False),
     }
+    metadata.pop("fix_commit", None)  # remove old singular key if present from previous runs
     meta_path.write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
     print(f"Wrote {cve_dir}/metadata.json")
 
     # Write human_fix.md — render all After blocks (fixes with multiple files)
     after_blocks = parsed.get("after_blocks", [])
+    if not after_blocks:
+        print(f"  WARNING: no After code blocks found in {md_path.name} — human_fix.md will be empty")
     if after_blocks:
         block_parts = []
         for block in after_blocks:
@@ -189,8 +210,11 @@ def main(cve_id: str, fixes_dir: Path, candidates_path: Path, benchmark_dir: Pat
         pr_number = pr["number"]
         diff = fetch_pr_diff(pr_number, repo)
 
-        (fixes_out_dir / f"pr_{pr_number}.diff").write_text(diff, encoding="utf-8")
-        print(f"Wrote {fixes_out_dir}/pr_{pr_number}.diff")
+        if diff:
+            (fixes_out_dir / f"pr_{pr_number}.diff").write_text(diff, encoding="utf-8")
+            print(f"Wrote {fixes_out_dir}/pr_{pr_number}.diff")
+        else:
+            print(f"  WARNING: gh pr diff returned empty for PR #{pr_number} — diff not written")
 
         # Preserve council block and human_verdict if verdict already exists
         verdict_path = fixes_out_dir / f"pr_{pr_number}_verdict.json"

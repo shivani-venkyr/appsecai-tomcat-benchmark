@@ -12,7 +12,10 @@ def _parse_affected_component(raw: str) -> dict:
     if len(parts) < 2:
         raise ValueError(f"Affected Component has no → separator: {raw!r}")
 
-    lhs = parts[0].strip().strip('`')  # e.g. "DigestCredentialHandlerBase.java"
+    # Extract first backtick-enclosed .java file from LHS; handles multi-file LHS like
+    # `File1.java` + `File2.java` by using only the first file for line-number lookup.
+    java_files = re.findall(r'`([^`]+\.java)`', parts[0])
+    lhs = java_files[0] if java_files else parts[0].strip().strip('`')
     rhs = parts[1].strip()
 
     # Extract backtick-enclosed tokens from the RHS; prefer those over raw text
@@ -36,10 +39,10 @@ def _parse_affected_component(raw: str) -> dict:
     if class_method:
         return {"grep_term": class_method.group(1), "is_class": True, "all_methods": all_methods}
 
-    # If the only token is a bare class name (uppercase, no parens), it's likely a utility
-    # being introduced rather than the vulnerable method — fall back to the LHS file stem
+    # If the token is a bare class name (uppercase, no parens) OR multi-word free text
+    # (spaces indicate a description, not a method name), fall back to the LHS file stem
     # so find_declaration_line searches for the class declaration in the original file.
-    if first and first[0].isupper() and not first[0].isdigit() and lhs.endswith('.java'):
+    if first and not first[0].isdigit() and (' ' in first or first[0].isupper()) and lhs.endswith('.java'):
         file_stem = Path(lhs).stem
         return {"grep_term": file_stem, "is_class": True, "all_methods": all_methods}
 
@@ -77,6 +80,7 @@ def parse_markdown(path: Path) -> dict:
     before_file_path = None
     after_file_path = None
     done = False
+    before_captured = False  # True once the first Before block is fully read
 
     with open(path, encoding="utf-8") as f:
         for line in f:
@@ -109,15 +113,19 @@ def parse_markdown(path: Path) -> dict:
                     state = "SCANNING_BEFORE"
 
             elif state == "SCANNING_BEFORE":
-                m = re.match(r'`([^`]+\.java)`', line)
-                if m:
-                    before_file_path = m.group(1)
-                elif re.match(r'^```\w', line.strip()):
-                    state = "IN_BEFORE_CODE"
+                if line.startswith("## After"):
+                    state = "SCANNING_AFTER"
+                elif not before_captured:
+                    m = re.match(r'`([^`]+\.java)`', line)
+                    if m:
+                        before_file_path = m.group(1)
+                    elif re.match(r'^```\w', line.strip()):
+                        state = "IN_BEFORE_CODE"
 
             elif state == "IN_BEFORE_CODE":
                 if line.strip() == "```":
-                    state = "SCANNING_AFTER"
+                    before_captured = True
+                    state = "SCANNING_BEFORE"  # go back — multi-file Before or ## After may follow
                 else:
                     before_lines.append(line)
 
@@ -244,11 +252,17 @@ def build_sarif(cve_data: dict, start_line: int, end_line: int, snippet_lines: l
     }
 
 
-def main(fixes_dir: Path, sarif_dir: Path, tomcat_dir: Path) -> None:
+def main(fixes_dir: Path, sarif_dir: Path, tomcat_dir: Path | None = None, cve_ids: list[str] | None = None) -> None:
     sarif_dir.mkdir(parents=True, exist_ok=True)
     base_dir = Path(__file__).parent.parent
 
-    for md_path in sorted(fixes_dir.glob("CVE-*.md")):
+    all_md_paths = sorted(fixes_dir.glob("CVE-*.md"))
+    if cve_ids:
+        md_paths = [p for p in all_md_paths if any(p.name == cid + "_before_after.md" for cid in cve_ids)]
+    else:
+        md_paths = all_md_paths
+
+    for md_path in md_paths:
         try:
             cve_data = parse_markdown(md_path)
         except Exception as e:
@@ -277,8 +291,11 @@ def main(fixes_dir: Path, sarif_dir: Path, tomcat_dir: Path) -> None:
         if src_file.exists():
             actual_lines = src_file.read_text(encoding="utf-8", errors="replace").splitlines()
             end_line = min(end_line, len(actual_lines))
+            end_line = max(end_line, start_line)  # SARIF requires endLine >= startLine
             if start_line > 1:
-                snippet_lines = actual_lines[start_line - 1 : end_line]
+                candidate = actual_lines[start_line - 1 : end_line]
+                if candidate:  # guard against start_line beyond actual file length
+                    snippet_lines = candidate
 
         sarif = build_sarif(cve_data, start_line, end_line, snippet_lines)
 
@@ -291,6 +308,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Generate SARIF 2.1.0 files from CVE markdown")
     parser.add_argument("--fixes-dir", type=Path, default=Path("fixes"))
     parser.add_argument("--sarif-dir", type=Path, default=Path("sarif"))
-    parser.add_argument("--tomcat-dir", type=Path, default=Path("tomcat"))
+    parser.add_argument("--tomcat-dir", type=Path, default=None, help="(unused, kept for backward compat)")
+    parser.add_argument("--cve-ids", default=None, help="Comma-separated CVE IDs to process (default: all)")
     args = parser.parse_args()
-    main(args.fixes_dir, args.sarif_dir, args.tomcat_dir)
+    cve_ids = [c.strip() for c in args.cve_ids.split(',')] if args.cve_ids else None
+    main(args.fixes_dir, args.sarif_dir, args.tomcat_dir, cve_ids)
