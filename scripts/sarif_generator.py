@@ -256,7 +256,7 @@ def main(fixes_dir: Path, sarif_dir: Path, tomcat_dir: Path | None = None, cve_i
     sarif_dir.mkdir(parents=True, exist_ok=True)
     base_dir = Path(__file__).parent.parent
 
-    all_md_paths = sorted(fixes_dir.glob("CVE-*.md"))
+    all_md_paths = sorted(fixes_dir.glob("CVE-*_before_after.md"))
     if cve_ids:
         md_paths = [p for p in all_md_paths if any(p.name == cid + "_before_after.md" for cid in cve_ids)]
     else:
