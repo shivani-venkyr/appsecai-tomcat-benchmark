@@ -37,12 +37,10 @@ jobs:
       - name: Install Python dependencies
         run: pip install anthropic
 
-      - name: Install council of experts
-        # Requires COUNCIL_TOKEN secret (PAT with access to AppSecureAI/DevDocs)
-        # and OPENAI_API_KEY secret for the Codex expert
-        if: ${{ secrets.COUNCIL_TOKEN != '' }}
+      - name: Install AI CLIs for council
+        # claude and codex CLIs are called by the vendored council_of_experts library.
+        # They authenticate via ANTHROPIC_API_KEY and OPENAI_API_KEY env vars.
         run: |
-          pip install "git+https://${{ secrets.COUNCIL_TOKEN }}@github.com/AppSecureAI/DevDocs.git#subdirectory=tools/council-of-experts"
           npm install -g @anthropic-ai/claude-code
           npm install -g @openai/codex
         continue-on-error: true
@@ -201,7 +199,6 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
-          which council || { echo "council not installed, skipping"; exit 0; }
           for cve in $(echo "$CVE_LIST" | tr ',' ' '); do
             [[ "$cve" =~ ^CVE-[0-9]{4}-[0-9]+$ ]] || { echo "Skipping invalid token: $cve"; continue; }
             python scripts/run_council.py "$cve" \

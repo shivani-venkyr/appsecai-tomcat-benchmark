@@ -13,9 +13,15 @@ Usage:
 import argparse
 import json
 import re
-import subprocess
 import sys
 from pathlib import Path
+
+
+def _ensure_council_importable() -> None:
+    """Add vendor/ to sys.path so council_of_experts is importable without installation."""
+    vendor = Path(__file__).parent.parent / "vendor"
+    if str(vendor) not in sys.path:
+        sys.path.insert(0, str(vendor))
 
 PROMPT_TEMPLATE = """\
 You are evaluating an AI-generated security fix against the correct human fix for a real CVE in Apache Tomcat.
@@ -82,13 +88,33 @@ def parse_comparison_file(path: Path) -> tuple[dict, str, list[dict]]:
 
 
 def run_council(prompt: str) -> dict:
-    result = subprocess.run(
-        ["council", "ask", prompt, "--json"],
-        capture_output=True, text=True, timeout=600
+    _ensure_council_importable()
+    from council_of_experts.consensus import run_council as _run_council
+    from council_of_experts.experts.claude import ClaudeExpert
+    from council_of_experts.experts.codex import CodexExpert
+
+    # The council CLI wraps prompts with a JSON shape so experts return structured
+    # output. Replicate that here so the consensus has answer/key_points/confidence.
+    shape = {
+        "answer": "<your full answer; markdown allowed>",
+        "key_points": ["<key point>"],
+        "confidence": "high|medium|low",
+    }
+    wrapped = (
+        f"{prompt}\n\n"
+        f"Return STRICT JSON only (no markdown fences, no prose outside JSON) matching:\n"
+        f"{json.dumps(shape, indent=2)}"
     )
-    if result.returncode != 0:
-        raise RuntimeError(f"council failed: {result.stderr}")
-    return json.loads(result.stdout)
+
+    merged, status = _run_council(
+        wrapped,
+        experts=[ClaudeExpert(timeout=600), CodexExpert(timeout=600)],
+        log=lambda _: None,
+    )
+
+    if merged is None:
+        raise RuntimeError(f"All council experts failed: {status['experts']}")
+    return merged
 
 
 def extract_classification(answer: str) -> str:
