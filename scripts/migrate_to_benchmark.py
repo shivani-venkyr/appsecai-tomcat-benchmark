@@ -1,10 +1,11 @@
 """
-One-time migration: builds benchmark/ from pipeline_data/ and fixes/comparisons/.
+One-time migration: builds benchmark/ from legacy pipeline_data/ and fixes/comparisons/.
+Already run — kept for reference. Source files have since been deleted/moved.
 
 Reads:
-  pipeline_data/appsecai_runs.json    — run history (PR#, date, system_version)
-  pipeline_data/council_results.json  — council verdicts
-  pipeline_data/cve_candidates.json   — fix_commits, short_description, tomcat_version
+  pipeline_data/appsecai_runs.json    — legacy run history (now deleted)
+  pipeline_data/council_results.json  — legacy council verdicts (now deleted)
+  cve_candidates.json                 — fix_commits, short_description, tomcat_version
   fixes/CVE-*_before_after.md         — CWE, severity, D1, human fix
   comparisons/CVE-*.md                — human vs AI comparison text
 
@@ -92,9 +93,9 @@ def write(path: Path, content: str) -> None:
 
 
 def main() -> None:
-    runs = json.loads(Path("pipeline_data/appsecai_runs.json").read_text())
-    council = json.loads(Path("pipeline_data/council_results.json").read_text())
-    candidates = {c["cve_id"]: c for c in json.loads(Path("pipeline_data/cve_candidates.json").read_text())}
+    runs = json.loads(Path("pipeline_data/appsecai_runs.json").read_text())  # legacy
+    council = json.loads(Path("pipeline_data/council_results.json").read_text())  # legacy
+    candidates = {c["cve_id"]: c for c in json.loads(Path("cve_candidates.json").read_text())}
 
     if DRY_RUN:
         print("DRY RUN — no files will be written\n")

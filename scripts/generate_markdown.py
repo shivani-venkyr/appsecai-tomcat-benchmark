@@ -3,7 +3,7 @@ Generate a CVE fix markdown by calling the Claude API with the raw git diff.
 
 Usage:
     python scripts/generate_markdown.py --cve-id CVE-XXXX-XXXXX \
-        [--candidates pipeline_data/cve_candidates.json] \
+        [--candidates cve_candidates.json] \
         [--fixes-dir fixes] \
         [--tomcat-repo https://github.com/apache/tomcat.git]
 """
@@ -223,7 +223,7 @@ def main(
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--cve-id", required=True)
-    parser.add_argument("--candidates", type=Path, default=Path("pipeline_data/cve_candidates.json"))
+    parser.add_argument("--candidates", type=Path, default=Path("cve_candidates.json"))
     parser.add_argument("--fixes-dir", type=Path, default=Path("fixes"))
     parser.add_argument("--tomcat-repo", default="https://github.com/apache/tomcat.git")
     args = parser.parse_args()

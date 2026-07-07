@@ -58,13 +58,14 @@ jobs:
           import json, os
           from pathlib import Path
 
-          runs = json.loads(Path('pipeline_data/appsecai_runs.json').read_text())
           cve_id = os.environ.get('CVE_INPUT', '').strip()
 
           if cve_id:
               cves = [cve_id]
           else:
-              cves = [cve for cve, v in runs.items() if not v.get('submitted_to_appsecai')]
+              submitted = {p.parent.name for p in Path('benchmark').glob('*/CVE-*/metadata.json')}
+              has_fix = {p.name.replace('_before_after.md', '') for p in Path('fixes').glob('CVE-*_before_after.md')}
+              cves = sorted(has_fix - submitted)
 
           if not cves:
               print("No CVEs to process.")
@@ -88,7 +89,7 @@ jobs:
               echo "Generating markdown for $cve ..."
               python scripts/generate_markdown.py \
                 --cve-id "$cve" \
-                --candidates pipeline_data/cve_candidates.json \
+                --candidates cve_candidates.json \
                 --fixes-dir fixes \
                 --tomcat-repo https://github.com/apache/tomcat.git
             else
@@ -129,7 +130,7 @@ jobs:
             python scripts/organize_benchmark.py \
               --cve-id "$cve" \
               --fixes-dir fixes \
-              --candidates pipeline_data/cve_candidates.json \
+              --candidates cve_candidates.json \
               --benchmark-dir benchmark \
               --repo "${{ github.repository }}" \
               --system-version "${{ steps.version.outputs.system_version }}"
@@ -161,39 +162,6 @@ jobs:
             python scripts/run_council.py "$cve"
           done
 
-      - name: Update runs log
-        if: success() && steps.resolve-cves.outputs.has_cves == 'true'
-        env:
-          CVE_LIST: ${{ steps.resolve-cves.outputs.cve_list }}
-          SYSTEM_VERSION: ${{ steps.version.outputs.system_version }}
-        run: |
-          python3 - <<'PYEOF'
-          import json, os
-          from datetime import date
-          from pathlib import Path
-
-          runs_path = Path('pipeline_data/appsecai_runs.json')
-          runs = json.loads(runs_path.read_text())
-
-          cves = [c for c in os.environ['CVE_LIST'].split(',') if c]
-          today = date.today().isoformat()
-          system_version = os.environ['SYSTEM_VERSION']
-
-          for cve in cves:
-              if cve not in runs:
-                  runs[cve] = {'submitted_to_appsecai': False, 'runs': []}
-              runs[cve]['submitted_to_appsecai'] = True
-              runs[cve]['runs'].append({
-                  'pr_created': None,
-                  'date': today,
-                  'system_version': system_version,
-                  'triage_result': None,
-              })
-
-          runs_path.write_text(json.dumps(runs, indent=2) + '\n')
-          print(f"Updated {len(cves)} CVE(s) on {today} (v{system_version})")
-          PYEOF
-
       - name: Commit and push all generated files
         if: success() && steps.resolve-cves.outputs.has_cves == 'true'
         env:
@@ -201,7 +169,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add fixes/ sarif/ pipeline_data/ benchmark/
+          git add fixes/ sarif/ benchmark/
           N=$(echo "$CVE_LIST" | tr ',' '\n' | wc -l | tr -d ' ')
           git diff --cached --quiet || git commit -m "chore: pipeline run for ${N} CVE(s) [skip ci]"
           git pull --rebase origin main

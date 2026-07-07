@@ -15,7 +15,7 @@ Usage:
     python scripts/organize_benchmark.py \
         --cve-id CVE-XXXX-XXXXX \
         --fixes-dir fixes \
-        --candidates pipeline_data/cve_candidates.json \
+        --candidates cve_candidates.json \
         --benchmark-dir benchmark
 """
 
@@ -171,7 +171,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--cve-id", required=True)
     parser.add_argument("--fixes-dir", type=Path, default=Path("fixes"))
-    parser.add_argument("--candidates", type=Path, default=Path("pipeline_data/cve_candidates.json"))
+    parser.add_argument("--candidates", type=Path, default=Path("cve_candidates.json"))
     parser.add_argument("--benchmark-dir", type=Path, default=Path("benchmark"))
     parser.add_argument("--repo", default="AppSecureAI/appsecai-tomcat-benchmark")
     parser.add_argument("--system-version", default=None)
