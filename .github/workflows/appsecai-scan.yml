@@ -43,6 +43,8 @@ jobs:
         if: ${{ secrets.COUNCIL_TOKEN != '' }}
         run: |
           pip install "git+https://${{ secrets.COUNCIL_TOKEN }}@github.com/AppSecureAI/DevDocs.git#subdirectory=tools/council-of-experts"
+          npm install -g @anthropic-ai/claude-code
+          npm install -g @openai/codex
         continue-on-error: true
 
       - name: Capture AppSecAI system version
