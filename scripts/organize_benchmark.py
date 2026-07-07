@@ -31,6 +31,7 @@ from pathlib import Path
 def parse_fix_markdown(md_path: Path) -> dict:
     data = {}
     after_lines = []
+    after_file = ""
     state = "TABLE"
 
     with open(md_path, encoding="utf-8") as f:
@@ -54,10 +55,13 @@ def parse_fix_markdown(md_path: Path) -> dict:
                     elif field == "Affected Component":
                         data["affected_component"] = re.sub(r'`', '', value).strip()
                 elif line.startswith("## After"):
-                    state = "SCAN_AFTER"
+                    state = "SCAN_AFTER_PATH"
 
-            elif state == "SCAN_AFTER":
-                if re.match(r'^```\w', line.strip()):
+            elif state == "SCAN_AFTER_PATH":
+                stripped = line.strip()
+                if stripped.startswith("`java/"):
+                    after_file = stripped.strip("`")
+                elif re.match(r'^```', stripped):
                     state = "IN_AFTER"
 
             elif state == "IN_AFTER":
@@ -65,11 +69,12 @@ def parse_fix_markdown(md_path: Path) -> dict:
                     break
                 after_lines.append(line)
 
+    data["after_file"] = after_file
     data["after_lines"] = after_lines
     return data
 
 
-def find_appsecai_pr(cve_id: str, repo: str) -> dict | None:
+def find_appsecai_pr(cve_id: str, repo: str, file_path: str | None = None) -> dict | None:
     result = subprocess.run(
         [
             "gh", "pr", "list",
@@ -84,15 +89,21 @@ def find_appsecai_pr(cve_id: str, repo: str) -> dict | None:
         return None
 
     prs = json.loads(result.stdout)
+    appsecai_prs = [p for p in prs if p["headRefName"].startswith("appsecai/fix-group/")]
 
-    # Match by CVE ID in the PR title — AppSecAI titles include the CVE ID directly
-    matches = [
-        p for p in prs
-        if p["headRefName"].startswith("appsecai/fix-group/") and cve_id in p["title"]
-    ]
+    matches = [p for p in appsecai_prs if cve_id in p["title"]]
     if matches:
         matches.sort(key=lambda p: p["createdAt"], reverse=True)
         return matches[0]
+
+    # Fallback: match by Java filename in title (handles grouped PRs with generic titles)
+    if file_path:
+        filename = Path(file_path).name
+        matches = [p for p in appsecai_prs if filename in p["title"]]
+        if matches:
+            matches.sort(key=lambda p: p["createdAt"], reverse=True)
+            print(f"  (matched by filename {filename!r} — grouped PR)")
+            return matches[0]
 
     return None
 
@@ -143,7 +154,8 @@ def main(cve_id: str, fixes_dir: Path, candidates_path: Path, benchmark_dir: Pat
     print(f"Wrote {cve_dir}/human_fix.md")
 
     # Find AppSecAI PR and write fix artifacts
-    pr = find_appsecai_pr(cve_id, repo)
+    after_file = parsed.get("after_file") or None
+    pr = find_appsecai_pr(cve_id, repo, file_path=after_file)
     if pr:
         pr_number = pr["number"]
         diff = fetch_pr_diff(pr_number, repo)
