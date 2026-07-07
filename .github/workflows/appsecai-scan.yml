@@ -138,8 +138,13 @@ jobs:
         run: |
           python3 - <<'PYEOF'
           import os
+          from pathlib import Path
           cves = [c for c in os.environ['CVE_LIST'].split(',') if c]
-          files = [f"sarif/{cve}.sarif" for cve in cves]
+          all_files = [f"sarif/{cve}.sarif" for cve in cves]
+          files = [f for f in all_files if Path(f).exists()]
+          missing = set(all_files) - set(files)
+          if missing:
+              print(f"WARNING: {len(missing)} SARIF file(s) not found (skipping): {sorted(missing)}")
           with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
               f.write("sarif_files<<EOF\n")
               f.write("\n".join(files) + "\n")
