@@ -34,7 +34,7 @@ class ClaudeExpert(Expert):
 
     def _complete_once(self, prompt: str, model: str) -> str:
         """One completion via ``claude -p`` (prompt on stdin)."""
-        cmd = ["claude", "-p"]
+        cmd = ["claude", "--bare", "-p"]
         if model:
             cmd += ["--model", model]
         proc = subprocess.run(
