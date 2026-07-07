@@ -8,6 +8,10 @@ on:
         required: false
         default: ''
 
+concurrency:
+  group: appsecai-scan
+  cancel-in-progress: false
+
 permissions:
   contents: write
   id-token: write
@@ -44,8 +48,8 @@ jobs:
       - name: Capture AppSecAI system version
         id: version
         run: |
-          VERSION=$(curl -s https://api.cloud.appsecai.io/api/health/version \
-            | python3 -c "import sys,json; print(json.load(sys.stdin)['version'])" 2>/dev/null || echo "unknown")
+          VERSION=$(curl -sf https://api.cloud.appsecai.io/api/health/version \
+            | python3 -c "import sys,json; print(json.load(sys.stdin)['version'])" || echo "unknown")
           echo "system_version=$VERSION" >> $GITHUB_OUTPUT
           echo "AppSecAI system version: $VERSION"
 
@@ -56,11 +60,20 @@ jobs:
         run: |
           python3 - <<'PYEOF'
           import os
+          import re
+          import sys
           from pathlib import Path
 
+          CVE_RE = re.compile(r'^CVE-\d{4}-\d+$')
           cve_id = os.environ.get('CVE_INPUT', '').strip()
 
           if cve_id:
+              if not CVE_RE.match(cve_id):
+                  print(f"ERROR: invalid CVE ID format: {cve_id!r}", file=sys.stderr)
+                  sys.exit(1)
+              submitted = {p.parent.name for p in Path('benchmark').glob('*/CVE-*/metadata.json')}
+              if cve_id in submitted:
+                  print(f"WARNING: {cve_id} is already in benchmark/ — re-running may create a duplicate AppSecAI PR")
               cves = [cve_id]
           else:
               submitted = {p.parent.name for p in Path('benchmark').glob('*/CVE-*/metadata.json')}
@@ -84,6 +97,7 @@ jobs:
           CVE_LIST: ${{ steps.resolve-cves.outputs.cve_list }}
         run: |
           for cve in $(echo "$CVE_LIST" | tr ',' ' '); do
+            [[ "$cve" =~ ^CVE-[0-9]{4}-[0-9]+$ ]] || { echo "Skipping invalid token: $cve"; continue; }
             md="fixes/${cve}_before_after.md"
             if [ ! -f "$md" ]; then
               echo "Generating markdown for $cve ..."
@@ -134,6 +148,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           for cve in $(echo "$CVE_LIST" | tr ',' ' '); do
+            [[ "$cve" =~ ^CVE-[0-9]{4}-[0-9]+$ ]] || { echo "Skipping invalid token: $cve"; continue; }
             python scripts/organize_benchmark.py \
               --cve-id "$cve" \
               --fixes-dir fixes \
@@ -150,6 +165,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           for cve in $(echo "$CVE_LIST" | tr ',' ' '); do
+            [[ "$cve" =~ ^CVE-[0-9]{4}-[0-9]+$ ]] || { echo "Skipping invalid token: $cve"; continue; }
             python scripts/generate_comparison.py \
               --cve-id "$cve" \
               --repo "${{ github.repository }}" \
@@ -166,6 +182,7 @@ jobs:
         run: |
           which council || { echo "council not installed, skipping"; exit 0; }
           for cve in $(echo "$CVE_LIST" | tr ',' ' '); do
+            [[ "$cve" =~ ^CVE-[0-9]{4}-[0-9]+$ ]] || { echo "Skipping invalid token: $cve"; continue; }
             python scripts/run_council.py "$cve"
           done
 
