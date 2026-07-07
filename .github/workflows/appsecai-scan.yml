@@ -36,7 +36,7 @@ jobs:
       - name: Install council of experts
         # Requires COUNCIL_TOKEN secret (PAT with access to AppSecureAI/DevDocs)
         # and OPENAI_API_KEY secret for the Codex expert
-        if: secrets.COUNCIL_TOKEN != ''
+        if: ${{ secrets.COUNCIL_TOKEN != '' }}
         run: |
           pip install "git+https://${{ secrets.COUNCIL_TOKEN }}@github.com/AppSecureAI/DevDocs.git#subdirectory=tools/council-of-experts"
         continue-on-error: true
@@ -55,7 +55,7 @@ jobs:
           CVE_INPUT: ${{ inputs.cve_id }}
         run: |
           python3 - <<'PYEOF'
-          import json, os
+          import os
           from pathlib import Path
 
           cve_id = os.environ.get('CVE_INPUT', '').strip()
@@ -110,9 +110,16 @@ jobs:
         env:
           CVE_LIST: ${{ steps.resolve-cves.outputs.cve_list }}
         run: |
-          FILES=$(echo "$CVE_LIST" | tr ',' '\n' | awk '{print "sarif/" $0 ".sarif"}' | tr '\n' ' ')
-          echo "sarif_files=$FILES" >> $GITHUB_OUTPUT
-          echo "SARIF files: $FILES"
+          python3 - <<'PYEOF'
+          import os
+          cves = [c for c in os.environ['CVE_LIST'].split(',') if c]
+          files = [f"sarif/{cve}.sarif" for cve in cves]
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+              f.write("sarif_files<<EOF\n")
+              f.write("\n".join(files) + "\n")
+              f.write("EOF\n")
+          print(f"SARIF files ({len(files)}): {files}")
+          PYEOF
 
       - name: AppSecAI Vulnerability Analysis
         if: steps.resolve-cves.outputs.has_cves == 'true'
