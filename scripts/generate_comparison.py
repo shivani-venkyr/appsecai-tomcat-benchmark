@@ -19,8 +19,9 @@ from pathlib import Path
 
 def parse_fix_markdown(md_path: Path) -> dict:
     data = {}
-    after_lines = []
-    after_file = ""
+    after_blocks: list[dict] = []
+    current_file = ""
+    current_lines: list[str] = []
     state = "TABLE"
     with open(md_path, encoding="utf-8") as f:
         for line in f:
@@ -41,16 +42,24 @@ def parse_fix_markdown(md_path: Path) -> dict:
                     state = "SCAN_AFTER_PATH"
             elif state == "SCAN_AFTER_PATH":
                 stripped = line.strip()
+                if stripped.startswith("## ") and not stripped.startswith("## After"):
+                    break  # left the After section
                 if stripped.startswith("`java/"):
-                    after_file = stripped.strip("`")
+                    current_file = stripped.strip("`")
                 elif re.match(r'^```', stripped):
+                    current_lines = []
                     state = "IN_AFTER"
             elif state == "IN_AFTER":
                 if line.strip() == "```":
-                    break
-                after_lines.append(line)
-    data["after_file"] = after_file
-    data["after_lines"] = after_lines
+                    after_blocks.append({"file": current_file, "lines": current_lines})
+                    current_file = ""
+                    current_lines = []
+                    state = "SCAN_AFTER_PATH"
+                else:
+                    current_lines.append(line)
+    data["after_blocks"] = after_blocks
+    data["after_file"] = after_blocks[0]["file"] if after_blocks else ""
+    data["after_lines"] = after_blocks[0]["lines"] if after_blocks else []
     return data
 
 
@@ -118,9 +127,7 @@ def process_cve(cve_id: str, fixes_dir: Path, benchmark_dir: Path, repo: str) ->
     cwe_id = data.get("cwe_id", "CWE-UNKNOWN")
     cwe_full = data.get("cwe_full", cwe_id)
     severity = data.get("severity", "Unknown")
-    human_fix = "\n".join(data["after_lines"])
     after_file = data.get("after_file", "")
-    file_header = f"`{after_file}`\n\n" if after_file else ""
 
     pr = find_appsecai_pr(cve_id, repo, file_path=after_file or None)
     if not pr:
@@ -136,15 +143,24 @@ def process_cve(cve_id: str, fixes_dir: Path, benchmark_dir: Path, repo: str) ->
     java_diff = filter_java_diff(diff)
     cve_dir = find_cve_dir(cve_id, cwe_id, benchmark_dir)
 
+    # Render all After blocks (handles fixes touching multiple files)
+    after_blocks = data.get("after_blocks", [])
+    if after_blocks:
+        human_fix_parts = []
+        for block in after_blocks:
+            file_hdr = f"`{block['file']}`\n\n" if block["file"] else ""
+            human_fix_parts.append(file_hdr + "```java\n" + "\n".join(block["lines"]) + "\n```")
+        human_fix_section = "\n\n".join(human_fix_parts)
+    else:
+        human_fix_section = "```java\n\n```"
+
     content = f"""# {cve_id} Fix Comparison
 
 **CVE:** {cve_id} | **CWE:** {cwe_full} | **Severity:** {severity} | **PR:** #{pr_number}
 
 ## Human Fix
 
-{file_header}```java
-{human_fix}
-```
+{human_fix_section}
 
 ## AI Fix (AppSecAI PR #{pr_number})
 

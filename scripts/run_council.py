@@ -185,8 +185,8 @@ def main() -> None:
         files = sorted(BENCHMARK_DIR.glob(f"*/CVE-*/comparison.md"))
         files = [f for f in files if target in str(f)]
         if not files:
-            print(f"No comparison.md found for {target} in benchmark/")
-            sys.exit(1)
+            print(f"No comparison.md found for {target} in benchmark/ — skipping")
+            sys.exit(0)
     else:
         files = sorted(BENCHMARK_DIR.glob("*/CVE-*/comparison.md"))
 

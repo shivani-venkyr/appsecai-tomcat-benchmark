@@ -30,8 +30,9 @@ from pathlib import Path
 
 def parse_fix_markdown(md_path: Path) -> dict:
     data = {}
-    after_lines = []
-    after_file = ""
+    after_blocks: list[dict] = []
+    current_file = ""
+    current_lines: list[str] = []
     state = "TABLE"
 
     with open(md_path, encoding="utf-8") as f:
@@ -59,18 +60,27 @@ def parse_fix_markdown(md_path: Path) -> dict:
 
             elif state == "SCAN_AFTER_PATH":
                 stripped = line.strip()
+                if stripped.startswith("## ") and not stripped.startswith("## After"):
+                    break  # left the After section
                 if stripped.startswith("`java/"):
-                    after_file = stripped.strip("`")
+                    current_file = stripped.strip("`")
                 elif re.match(r'^```', stripped):
+                    current_lines = []
                     state = "IN_AFTER"
 
             elif state == "IN_AFTER":
                 if line.strip() == "```":
-                    break
-                after_lines.append(line)
+                    after_blocks.append({"file": current_file, "lines": current_lines})
+                    current_file = ""
+                    current_lines = []
+                    state = "SCAN_AFTER_PATH"
+                else:
+                    current_lines.append(line)
 
-    data["after_file"] = after_file
-    data["after_lines"] = after_lines
+    data["after_blocks"] = after_blocks
+    # Convenience aliases used by find_appsecai_pr and legacy callers
+    data["after_file"] = after_blocks[0]["file"] if after_blocks else ""
+    data["after_lines"] = after_blocks[0]["lines"] if after_blocks else []
     return data
 
 
@@ -135,8 +145,11 @@ def main(cve_id: str, fixes_dir: Path, candidates_path: Path, benchmark_dir: Pat
     cve_dir.mkdir(parents=True, exist_ok=True)
     fixes_out_dir.mkdir(exist_ok=True)
 
-    # Write metadata.json
+    # Write metadata.json — merge with existing to preserve rich fields from migration
+    meta_path = cve_dir / "metadata.json"
+    existing_meta = json.loads(meta_path.read_text(encoding="utf-8")) if meta_path.exists() else {}
     metadata = {
+        **existing_meta,
         "cve_id": cve_id,
         "cwe": cwe,
         "severity": parsed.get("severity", ""),
@@ -145,11 +158,19 @@ def main(cve_id: str, fixes_dir: Path, candidates_path: Path, benchmark_dir: Pat
         "tomcat_version": version,
         "fix_commit": candidate.get("fix_commits", [None])[0],
     }
-    (cve_dir / "metadata.json").write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
+    meta_path.write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
     print(f"Wrote {cve_dir}/metadata.json")
 
-    # Write human_fix.md
-    human_fix_content = f"# {cve_id} — Human Fix\n\n```java\n" + "\n".join(parsed["after_lines"]) + "\n```\n"
+    # Write human_fix.md — render all After blocks (fixes with multiple files)
+    after_blocks = parsed.get("after_blocks", [])
+    if after_blocks:
+        block_parts = []
+        for block in after_blocks:
+            file_hdr = f"`{block['file']}`\n\n" if block["file"] else ""
+            block_parts.append(file_hdr + "```java\n" + "\n".join(block["lines"]) + "\n```")
+        human_fix_content = f"# {cve_id} — Human Fix\n\n" + "\n\n".join(block_parts) + "\n"
+    else:
+        human_fix_content = f"# {cve_id} — Human Fix\n\n```java\n\n```\n"
     (cve_dir / "human_fix.md").write_text(human_fix_content, encoding="utf-8")
     print(f"Wrote {cve_dir}/human_fix.md")
 
@@ -163,17 +184,20 @@ def main(cve_id: str, fixes_dir: Path, candidates_path: Path, benchmark_dir: Pat
         (fixes_out_dir / f"pr_{pr_number}.diff").write_text(diff, encoding="utf-8")
         print(f"Wrote {fixes_out_dir}/pr_{pr_number}.diff")
 
-        verdict = {
+        # Preserve council block and human_verdict if verdict already exists
+        verdict_path = fixes_out_dir / f"pr_{pr_number}_verdict.json"
+        existing_verdict = json.loads(verdict_path.read_text(encoding="utf-8")) if verdict_path.exists() else {}
+        verdict: dict = {
             "pr_number": pr_number,
             "pr_url": pr["url"],
             "date": date.today().isoformat(),
             "system_version": system_version,
             "status": "pr_created",
-            "human_verdict": None,
+            "human_verdict": existing_verdict.get("human_verdict"),
         }
-        (fixes_out_dir / f"pr_{pr_number}_verdict.json").write_text(
-            json.dumps(verdict, indent=2) + "\n", encoding="utf-8"
-        )
+        if "council" in existing_verdict:
+            verdict["council"] = existing_verdict["council"]
+        verdict_path.write_text(json.dumps(verdict, indent=2) + "\n", encoding="utf-8")
         print(f"Wrote {fixes_out_dir}/pr_{pr_number}_verdict.json")
     else:
         print("No AppSecAI PR found — appsec_fixes/ left empty")

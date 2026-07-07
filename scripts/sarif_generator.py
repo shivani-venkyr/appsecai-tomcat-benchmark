@@ -12,13 +12,18 @@ def _parse_affected_component(raw: str) -> dict:
     if len(parts) < 2:
         raise ValueError(f"Affected Component has no → separator: {raw!r}")
 
+    lhs = parts[0].strip().strip('`')  # e.g. "DigestCredentialHandlerBase.java"
     rhs = parts[1].strip()
 
     # Extract backtick-enclosed tokens from the RHS; prefer those over raw text
     backtick_tokens = re.findall(r'`([^`]+)`', rhs)
     method_tokens = [t for t in backtick_tokens if not t.endswith('.java')]
 
-    if method_tokens:
+    # Prefer tokens that look like method calls (end with '()'); fall back to all tokens
+    method_call_tokens = [t for t in method_tokens if t.endswith('()')]
+    if method_call_tokens:
+        all_methods = method_call_tokens
+    elif method_tokens:
         all_methods = method_tokens
     else:
         rhs_clean = re.sub(r'`', '', rhs).strip()
@@ -30,8 +35,15 @@ def _parse_affected_component(raw: str) -> dict:
     class_method = re.match(r'^([A-Z]\w+)\.(\w+)', first)
     if class_method:
         return {"grep_term": class_method.group(1), "is_class": True, "all_methods": all_methods}
-    else:
-        return {"grep_term": first, "is_class": False, "all_methods": all_methods}
+
+    # If the only token is a bare class name (uppercase, no parens), it's likely a utility
+    # being introduced rather than the vulnerable method — fall back to the LHS file stem
+    # so find_declaration_line searches for the class declaration in the original file.
+    if first and first[0].isupper() and not first[0].isdigit() and lhs.endswith('.java'):
+        file_stem = Path(lhs).stem
+        return {"grep_term": file_stem, "is_class": True, "all_methods": all_methods}
+
+    return {"grep_term": first, "is_class": False, "all_methods": all_methods}
 
 
 def _clean_before_lines(lines: list[str], is_class: bool) -> list[str]:
@@ -237,7 +249,11 @@ def main(fixes_dir: Path, sarif_dir: Path, tomcat_dir: Path) -> None:
     base_dir = Path(__file__).parent.parent
 
     for md_path in sorted(fixes_dir.glob("CVE-*.md")):
-        cve_data = parse_markdown(md_path)
+        try:
+            cve_data = parse_markdown(md_path)
+        except Exception as e:
+            print(f"ERROR: skipping {md_path.name}: {e}")
+            continue
         cve_id = cve_data["cve_id"]
 
         src_file = base_dir / cve_data["before_file_path"]
