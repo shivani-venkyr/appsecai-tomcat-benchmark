@@ -64,8 +64,9 @@ def parse_fix_markdown(md_path: Path) -> dict:
                 stripped = line.strip()
                 if stripped.startswith("## ") and not stripped.startswith("## After"):
                     break  # left the After section
-                if re.match(r'^`[^`]+\.java`$', stripped):
-                    current_file = stripped.strip("`")
+                m = re.match(r'^`([^`]+\.java)`', stripped)
+                if m:
+                    current_file = m.group(1)
                 elif re.match(r'^```', stripped) and current_file:
                     # Only open a block when a file path preceded it; bare fences
                     # without a file path are illustrative blocks, not fix code.
