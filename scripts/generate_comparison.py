@@ -66,7 +66,7 @@ def parse_fix_markdown(md_path: Path) -> dict:
 def find_appsecai_pr(cve_id: str, repo: str, file_path: str | None = None) -> dict | None:
     result = subprocess.run(
         ["gh", "pr", "list", "--repo", repo, "--state", "all",
-         "--json", "number,url,headRefName,title,createdAt", "--limit", "100"],
+         "--json", "number,url,headRefName,title,body,createdAt", "--limit", "500"],
         capture_output=True, text=True,
     )
     if result.returncode != 0:
@@ -74,18 +74,26 @@ def find_appsecai_pr(cve_id: str, repo: str, file_path: str | None = None) -> di
     prs = json.loads(result.stdout)
     appsecai_prs = [p for p in prs if p["headRefName"].startswith("appsecai/fix-group/")]
 
+    # 1. CVE ID in title (most reliable — works for single-CVE PRs)
     matches = [p for p in appsecai_prs if cve_id in p["title"]]
     if matches:
         matches.sort(key=lambda p: p["createdAt"], reverse=True)
         return matches[0]
 
-    # Fallback: match by Java filename in title (handles grouped PRs with generic titles)
+    # 2. CVE ID in PR body (grouped PRs list each CVE in the description)
+    matches = [p for p in appsecai_prs if cve_id in (p.get("body") or "")]
+    if matches:
+        matches.sort(key=lambda p: p["createdAt"], reverse=True)
+        print(f"  (matched by CVE ID in PR body — grouped PR)")
+        return matches[0]
+
+    # 3. Filename in title (last resort — may match wrong PR if two CVEs share a file)
     if file_path:
         filename = Path(file_path).name
         matches = [p for p in appsecai_prs if filename in p["title"]]
         if matches:
             matches.sort(key=lambda p: p["createdAt"], reverse=True)
-            print(f"  (matched by filename {filename!r} — grouped PR)")
+            print(f"  (matched by filename {filename!r} — verify this is the right PR)")
             return matches[0]
 
     return None

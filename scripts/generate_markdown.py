@@ -46,7 +46,7 @@ def fetch_diff(sha: str, tomcat_repo: str) -> str:
             raise RuntimeError(f"git fetch failed for {sha}:\n{result.stderr}")
 
         result = subprocess.run(
-            ["git", "show", "--diff-filter=M", sha],
+            ["git", "show", "--diff-filter=AM", sha],
             cwd=tmp, capture_output=True, text=True,
         )
         if result.returncode != 0:
@@ -78,8 +78,8 @@ Analyze the git diff below and produce a `fixes/{cve_id}_before_after.md` file d
 - CVE ID: {cve_id}
 - Severity: {severity}
 - Description: {short_description}
-- Fix commit: {fix_commit}
-- D1 Score: {d1_score} ({lines_changed} Java lines changed)
+- Fix commit(s): {fix_commits}
+- D1 Score: {d1_score} ({lines_changed} Java lines changed across all commits)
 
 ## Raw Git Diff
 ```diff
@@ -193,22 +193,32 @@ def main(
         print(f"ERROR: {cve_id} not found in {candidates_path}", file=sys.stderr)
         sys.exit(1)
 
-    sha = entry["fix_commits"][0]
-    print(f"Fetching diff for {cve_id} @ {sha[:8]} ...")
-    diff_text = fetch_diff(sha, tomcat_repo)
+    shas = entry["fix_commits"]
+    diff_parts = []
+    total_lines = 0
+    for sha in shas:
+        print(f"Fetching diff for {cve_id} @ {sha[:8]} ...")
+        diff = fetch_diff(sha, tomcat_repo)
+        diff_parts.append(f"### Commit {sha[:8]}\n{diff}")
+        total_lines += count_java_lines(diff)
 
-    lines_changed = count_java_lines(diff_text)
-    score = d1_score(lines_changed)
-    print(f"  {lines_changed} Java lines changed, D1={score}")
+    diff_text = "\n".join(diff_parts)
+    score = d1_score(total_lines)
+    print(f"  {total_lines} Java lines changed across {len(shas)} commit(s), D1={score}")
+
+    DIFF_CAP = 24000
+    if len(diff_text) > DIFF_CAP:
+        print(f"  WARNING: combined diff is {len(diff_text)} chars, truncating to {DIFF_CAP}")
+        diff_text = diff_text[:DIFF_CAP]
 
     prompt = PROMPT_TEMPLATE.format(
         cve_id=cve_id,
         severity=entry["severity"],
         short_description=entry["short_description"],
-        fix_commit=sha[:8],
+        fix_commits=", ".join(s[:8] for s in shas),
         d1_score=score,
-        lines_changed=lines_changed,
-        diff_text=diff_text[:12000],  # cap at ~12k chars to stay within context
+        lines_changed=total_lines,
+        diff_text=diff_text,
     )
 
     print("Calling Claude API ...")

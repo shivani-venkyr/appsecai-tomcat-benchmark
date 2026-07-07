@@ -93,6 +93,11 @@ def run_council(prompt: str) -> dict:
 
 
 def extract_classification(answer: str) -> str:
+    # Anchor to the start — the prompt instructs the council to open with the verdict word
+    m = re.match(r'\s*(Accepted|Rejected)\b', answer.strip(), re.IGNORECASE)
+    if m:
+        return m.group(1).capitalize()
+    # Fallback: scan for first occurrence (older responses or format drift)
     m = re.search(r'\b(Accepted|Rejected)\b', answer, re.IGNORECASE)
     return m.group(1).capitalize() if m else "Unknown"
 
