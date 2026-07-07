@@ -113,7 +113,8 @@ jobs:
                 --cve-id "$cve" \
                 --candidates cve_candidates.json \
                 --fixes-dir fixes \
-                --tomcat-repo https://github.com/apache/tomcat.git
+                --tomcat-repo https://github.com/apache/tomcat.git \
+                || echo "WARNING: generate_markdown failed for $cve, continuing"
             else
               echo "Markdown already exists for $cve, skipping."
             fi
