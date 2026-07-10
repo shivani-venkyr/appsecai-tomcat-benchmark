@@ -1,0 +1,63 @@
+name: Refresh Codex OAuth Token
+
+on:
+  schedule:
+    - cron: '0 6 */5 * *'  # every 5 days at 06:00 UTC
+  workflow_dispatch:        # allow manual trigger
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Write current auth.json
+        run: |
+          mkdir -p ~/.codex
+          echo '${{ secrets.CODEX_AUTH_JSON }}' > ~/.codex/auth.json
+
+      - name: Backdate last_refresh to force token refresh
+        run: |
+          python3 - <<'EOF'
+          import json, datetime, pathlib
+          path = pathlib.Path.home() / ".codex/auth.json"
+          data = json.loads(path.read_text())
+          # Set last_refresh 12 days in the past so Codex treats the token as expired
+          stale = (datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=12)).strftime(
+              "%Y-%m-%dT%H:%M:%S.%f"
+          ) + "Z"
+          data["last_refresh"] = stale
+          path.write_text(json.dumps(data))
+          print(f"Set last_refresh to {stale}")
+          EOF
+
+      - name: Install Codex CLI
+        run: npm install -g @openai/codex
+
+      - name: Run Codex to trigger token refresh
+        run: |
+          echo "what is 1+1" | codex exec --skip-git-repo-check --json -s read-only - \
+            || echo "WARNING: codex command failed — refresh may not have occurred"
+
+      - name: Verify last_refresh was updated
+        run: |
+          python3 - <<'EOF'
+          import json, datetime, pathlib
+          data = json.loads((pathlib.Path.home() / ".codex/auth.json").read_text())
+          refreshed_at = data.get("last_refresh", "missing")
+          print(f"last_refresh is now: {refreshed_at}")
+          # Fail if last_refresh is still more than 1 day old (refresh didn't happen)
+          ts = datetime.datetime.fromisoformat(refreshed_at.replace("Z", "+00:00"))
+          age = (datetime.datetime.now(datetime.timezone.utc) - ts).total_seconds()
+          if age > 86400:
+              raise SystemExit(f"ERROR: last_refresh is {age/3600:.1f}h old — refresh did not occur")
+          print("Token refresh confirmed.")
+          EOF
+
+      - name: Update CODEX_AUTH_JSON secret
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          gh secret set CODEX_AUTH_JSON \
+            --repo AppSecureAI/appsecai-tomcat-benchmark \
+            < ~/.codex/auth.json
+          echo "CODEX_AUTH_JSON secret updated successfully."
