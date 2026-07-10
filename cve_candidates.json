@@ -7,11 +7,7 @@
       "063e2e81ede50c287f737cc8e2915ce7217e886e",
       "8a2285f13affa961cc65595aad999db5efae45ce"
     ],
-    "fix_year": 2023,
-    "tomcat_version": "11",
-    "also_tomcat_version": [
-      "10"
-    ]
+    "fix_year": 2023
   },
   {
     "cve_id": "CVE-2023-28708",
@@ -21,11 +17,7 @@
       "c64d496dda1560b5df113be55fbfaefec349b50f",
       "f509bbf31fc00abe3d9f25ebfabca5e05173da5b"
     ],
-    "fix_year": 2023,
-    "tomcat_version": "11",
-    "also_tomcat_version": [
-      "10"
-    ]
+    "fix_year": 2023
   },
   {
     "cve_id": "CVE-2023-28709",
@@ -35,11 +27,7 @@
       "d53d8e7f77042cc32a3b98f589496a1ef5088e38",
       "ba848da71c523d94950d3c53c19ea155189df9dc"
     ],
-    "fix_year": 2023,
-    "tomcat_version": "11",
-    "also_tomcat_version": [
-      "10"
-    ]
+    "fix_year": 2023
   },
   {
     "cve_id": "CVE-2023-34981",
@@ -49,11 +37,7 @@
       "739c7381aed22b7636351caf885ddc519ab6b442",
       "f0742f47b98aca943097f7f88e0d1163f57527e3"
     ],
-    "fix_year": 2023,
-    "tomcat_version": "11",
-    "also_tomcat_version": [
-      "10"
-    ]
+    "fix_year": 2023
   },
   {
     "cve_id": "CVE-2023-41080",
@@ -72,11 +56,7 @@
       "d6db22e411307c97ddf78315c15d5889356eca38",
       "9375d67106f8df9eb9d7b360b2bef052fe67d3d4"
     ],
-    "fix_year": 2023,
-    "tomcat_version": "11",
-    "also_tomcat_version": [
-      "10"
-    ]
+    "fix_year": 2023
   },
   {
     "cve_id": "CVE-2023-44487",
@@ -86,11 +66,7 @@
       "9cdfe25bad707f34b3e5da2994f3f1952a163c3e",
       "76bb4bfbfeae827dce896f650655bbf6e251ed49"
     ],
-    "fix_year": 2023,
-    "tomcat_version": "11",
-    "also_tomcat_version": [
-      "10"
-    ]
+    "fix_year": 2023
   },
   {
     "cve_id": "CVE-2023-45648",
@@ -100,11 +76,7 @@
       "eb5c094e5560764cda436362254997511a3ca1f6",
       "8ecff306507be8e4fd3adee1ae5de1ea6661a8f4"
     ],
-    "fix_year": 2023,
-    "tomcat_version": "11",
-    "also_tomcat_version": [
-      "10"
-    ]
+    "fix_year": 2023
   },
   {
     "cve_id": "CVE-2023-46589",
@@ -114,11 +86,7 @@
       "6f181e1062a472bc5f0234980f66cbde42c1041b",
       "b5776d769bffeade865061bc8ecbeb2b56167b08"
     ],
-    "fix_year": 2023,
-    "tomcat_version": "11",
-    "also_tomcat_version": [
-      "10"
-    ]
+    "fix_year": 2023
   },
   {
     "cve_id": "CVE-2024-23672",
@@ -128,11 +96,7 @@
       "b0e3b1bd78de270d53e319d7cb79eb282aa53cb9",
       "0052b374684b613b0c849899b325ebe334ac6501"
     ],
-    "fix_year": 2024,
-    "tomcat_version": "11",
-    "also_tomcat_version": [
-      "10"
-    ]
+    "fix_year": 2024
   },
   {
     "cve_id": "CVE-2024-24549",
@@ -142,11 +106,7 @@
       "810f49d5ff6d64b704af85d5b8d0aab9ec3c83f5",
       "d07c82194edb69d99b438828fe2cbfadbb207843"
     ],
-    "fix_year": 2024,
-    "tomcat_version": "11",
-    "also_tomcat_version": [
-      "10"
-    ]
+    "fix_year": 2024
   },
   {
     "cve_id": "CVE-2024-34750",
@@ -156,11 +116,7 @@
       "2344a4c0d03e307ba6b8ab6dc8b894cc8bac63f2",
       "2afae300c9ac9c0e516e2e9de580847d925365c3"
     ],
-    "fix_year": 2024,
-    "tomcat_version": "11",
-    "also_tomcat_version": [
-      "10"
-    ]
+    "fix_year": 2024
   },
   {
     "cve_id": "CVE-2024-38286",
@@ -170,11 +126,7 @@
       "3197862639732e16ec1164557bcd289ebc116c93",
       "3344c17cef094da4bb616f4186ed32039627b543"
     ],
-    "fix_year": 2024,
-    "tomcat_version": "11",
-    "also_tomcat_version": [
-      "10"
-    ]
+    "fix_year": 2024
   },
   {
     "cve_id": "CVE-2024-50379",
@@ -186,13 +138,7 @@
       "8554f6b1722b33a2ce8b0a3fad37825f3a75f2d2",
       "05ddeeaa54df1e2dc427d0164bedd6b79f78d81f"
     ],
-    "fix_year": 2024,
-    "tomcat_version": "11",
-    "also_tomcat_version": [
-      "11",
-      "10",
-      "10"
-    ]
+    "fix_year": 2024
   },
   {
     "cve_id": "CVE-2024-52316",
@@ -202,11 +148,7 @@
       "6d097a66746635df6880fe7662a792156b0eca14",
       "acc2f01395f895980f5d8a64573fcc1bade13369"
     ],
-    "fix_year": 2024,
-    "tomcat_version": "11",
-    "also_tomcat_version": [
-      "10"
-    ]
+    "fix_year": 2024
   },
   {
     "cve_id": "CVE-2024-52317",
@@ -216,11 +158,7 @@
       "9e840ccacb40881c03a03b1e0746bfba7369b3bd",
       "146f94f87ea398fb592c7a20a5ccbef95e9dd72b"
     ],
-    "fix_year": 2024,
-    "tomcat_version": "11",
-    "also_tomcat_version": [
-      "10"
-    ]
+    "fix_year": 2024
   },
   {
     "cve_id": "CVE-2024-52318",
@@ -230,11 +168,7 @@
       "8d1fc4733a06d1a03b9d644c57010f2ec5f0df38",
       "be8e32143a3159e78fe5463d09bb8e1b33bf2b1f"
     ],
-    "fix_year": 2024,
-    "tomcat_version": "11",
-    "also_tomcat_version": [
-      "10"
-    ]
+    "fix_year": 2024
   },
   {
     "cve_id": "CVE-2024-54677",
@@ -256,11 +190,7 @@
       "54e56495e9a106218efe9fc9c79d976c0032bbfd",
       "bbd82e9593314ade4cfd57248f9285fbad686f66"
     ],
-    "fix_year": 2024,
-    "tomcat_version": "11",
-    "also_tomcat_version": [
-      "10"
-    ]
+    "fix_year": 2024
   },
   {
     "cve_id": "CVE-2025-24813",
@@ -270,11 +200,7 @@
       "0a668e0c27f2b7ca0cc7c6eea32253b9b5ecb29c",
       "f6c01d6577cf9a1e06792be47e623d36acc3b5dc"
     ],
-    "fix_year": 2025,
-    "tomcat_version": "11",
-    "also_tomcat_version": [
-      "10"
-    ]
+    "fix_year": 2025
   },
   {
     "cve_id": "CVE-2025-31650",
@@ -288,11 +214,7 @@
       "1eef1dc459c45f1e421d8bd25ef340fc1cc34edc",
       "8cc3b8fb3f2d8d4d6a757e014f19d1fafa948a60"
     ],
-    "fix_year": 2025,
-    "tomcat_version": "11",
-    "also_tomcat_version": [
-      "10"
-    ]
+    "fix_year": 2025
   },
   {
     "cve_id": "CVE-2025-31651",
@@ -302,11 +224,7 @@
       "fbecc915a10c5a3d634c5e2c6ced4ff479ce9953",
       "066bf6b6a15a4e7e0941d4acf096841165b97098"
     ],
-    "fix_year": 2025,
-    "tomcat_version": "11",
-    "also_tomcat_version": [
-      "10"
-    ]
+    "fix_year": 2025
   },
   {
     "cve_id": "CVE-2025-46701",
@@ -318,11 +236,7 @@
       "2c6800111e7d8d8d5403c07978ea9bff3db5a5a5",
       "238d2aa54b99f91d1111467e2237d2244c64e558"
     ],
-    "fix_year": 2025,
-    "tomcat_version": "11",
-    "also_tomcat_version": [
-      "10"
-    ]
+    "fix_year": 2025
   },
   {
     "cve_id": "CVE-2025-48976",
@@ -332,11 +246,7 @@
       "74f69ffaf61e54c727603e7e831fe20f0ac5d2a7",
       "667ddd76e2a0e762f3a784d86f0d25e7fd7cdb86"
     ],
-    "fix_year": 2025,
-    "tomcat_version": "11",
-    "also_tomcat_version": [
-      "10"
-    ]
+    "fix_year": 2025
   },
   {
     "cve_id": "CVE-2025-48988",
@@ -346,11 +256,7 @@
       "2b0ab14fb55d4edc896e5f1817f2ab76f714ae5e",
       "cdde8e655bc1c5c60a07efd216251d77c52fd7f6"
     ],
-    "fix_year": 2025,
-    "tomcat_version": "11",
-    "also_tomcat_version": [
-      "10"
-    ]
+    "fix_year": 2025
   },
   {
     "cve_id": "CVE-2025-48989",
@@ -360,11 +266,7 @@
       "f362c8eb3b8ec5b7f312f7f5610731c0fb299a06",
       "73c04a10395774bda71a0b37802cf983662ce255"
     ],
-    "fix_year": 2025,
-    "tomcat_version": "11",
-    "also_tomcat_version": [
-      "10"
-    ]
+    "fix_year": 2025
   },
   {
     "cve_id": "CVE-2025-49124",
@@ -374,11 +276,7 @@
       "c56456cda8151c9504dfb7985700824559d769a7",
       "e0e07812224d327a321babb554f5a5758d30cc49"
     ],
-    "fix_year": 2025,
-    "tomcat_version": "11",
-    "also_tomcat_version": [
-      "10"
-    ]
+    "fix_year": 2025
   },
   {
     "cve_id": "CVE-2025-49125",
@@ -388,11 +286,7 @@
       "d94bd36fb7eb32e790dae0339bc249069649a637",
       "7617b9c247bc77ed0444dd69adcd8aa48777886c"
     ],
-    "fix_year": 2025,
-    "tomcat_version": "11",
-    "also_tomcat_version": [
-      "10"
-    ]
+    "fix_year": 2025
   },
   {
     "cve_id": "CVE-2025-52520",
@@ -402,11 +296,7 @@
       "a51e4bedccfafd35b7cdd0ee3e22267dee9f90db",
       "fc42bbccb9041fafd194fbfdf3eab1d44cb5c45c"
     ],
-    "fix_year": 2025,
-    "tomcat_version": "11",
-    "also_tomcat_version": [
-      "10"
-    ]
+    "fix_year": 2025
   },
   {
     "cve_id": "CVE-2025-53506",
@@ -416,11 +306,7 @@
       "be8f330f83ceddaf3baeed57522e571572b6b99b",
       "2aa6261276ebe50b99276953591e3a2be7898bdb"
     ],
-    "fix_year": 2025,
-    "tomcat_version": "11",
-    "also_tomcat_version": [
-      "10"
-    ]
+    "fix_year": 2025
   },
   {
     "cve_id": "CVE-2025-55668",
@@ -430,11 +316,7 @@
       "90306d971bb8b8393336d893644124fb2ca11d21",
       "8621e4c6ba2c916a41eb34cb0f781171ead33fb6"
     ],
-    "fix_year": 2025,
-    "tomcat_version": "11",
-    "also_tomcat_version": [
-      "10"
-    ]
+    "fix_year": 2025
   },
   {
     "cve_id": "CVE-2025-55752",
@@ -444,11 +326,7 @@
       "fec06c610ed7466b401e29cc567a58aee5ed826a",
       "130d36d8492ef9e4eb22952c17c92423cb35fd06"
     ],
-    "fix_year": 2025,
-    "tomcat_version": "11",
-    "also_tomcat_version": [
-      "10"
-    ]
+    "fix_year": 2025
   },
   {
     "cve_id": "CVE-2025-55754",
@@ -458,11 +336,7 @@
       "5a3db092982c0c58d4855304167ee757fe5e79bb",
       "138d7f5cfaae683078948303333c080e6faa75d2"
     ],
-    "fix_year": 2025,
-    "tomcat_version": "11",
-    "also_tomcat_version": [
-      "10"
-    ]
+    "fix_year": 2025
   },
   {
     "cve_id": "CVE-2025-61795",
@@ -472,11 +346,7 @@
       "1cdf5f730ede75a0759492f179ac21ca4ff68e06",
       "af6e9181620304c0d818121c29c074e1330610d0"
     ],
-    "fix_year": 2025,
-    "tomcat_version": "11",
-    "also_tomcat_version": [
-      "10"
-    ]
+    "fix_year": 2025
   },
   {
     "cve_id": "CVE-2025-66614",
@@ -489,13 +359,7 @@
       "972f9a5e2a07674d92610c478aac1b205d60724e",
       "5053fa82a1b2b52756810601227984a8b71888a4"
     ],
-    "fix_year": 2026,
-    "tomcat_version": "11",
-    "also_tomcat_version": [
-      "11",
-      "10",
-      "10"
-    ]
+    "fix_year": 2026
   },
   {
     "cve_id": "CVE-2026-24733",
@@ -505,11 +369,7 @@
       "6c73d74ff281260d74c836370ff6b82f1da8048b",
       "711b465cf22684a1acf0cb43501cdbbce9b6c5f4"
     ],
-    "fix_year": 2025,
-    "tomcat_version": "11",
-    "also_tomcat_version": [
-      "10"
-    ]
+    "fix_year": 2025
   },
   {
     "cve_id": "CVE-2026-24880",
@@ -529,11 +389,7 @@
       "4c5d306001b780c9316aea5ff6502c524fb20695",
       "5fb910f9a9dafa37a0c0965a1bd62a21dcf437f2"
     ],
-    "fix_year": 2026,
-    "tomcat_version": "11",
-    "also_tomcat_version": [
-      "10"
-    ]
+    "fix_year": 2026
   },
   {
     "cve_id": "CVE-2026-29129",
@@ -543,11 +399,7 @@
       "5cfa876d73f1ff5f4dc8309c4320f684cbeff74e",
       "8d69b33764dba81dce89e3a768de6093a35620ae"
     ],
-    "fix_year": 2026,
-    "tomcat_version": "11",
-    "also_tomcat_version": [
-      "10"
-    ]
+    "fix_year": 2026
   },
   {
     "cve_id": "CVE-2026-29145",
@@ -557,11 +409,7 @@
       "721591f7bff424c693f26adc18ae9b9abac3655b",
       "fe26667cd2385045ac73f4dea086cc9971209b90"
     ],
-    "fix_year": 2026,
-    "tomcat_version": "11",
-    "also_tomcat_version": [
-      "10"
-    ]
+    "fix_year": 2026
   },
   {
     "cve_id": "CVE-2026-29146",
@@ -573,13 +421,7 @@
       "55f3eb9148233054fccfdf761141c6894a050be1",
       "607ebc0fa522bd9e8c05517baa2d179bbd1e659c"
     ],
-    "fix_year": 2026,
-    "tomcat_version": "11",
-    "also_tomcat_version": [
-      "11",
-      "10",
-      "10"
-    ]
+    "fix_year": 2026
   },
   {
     "cve_id": "CVE-2026-34483",
@@ -598,11 +440,7 @@
       "301bc6efbf72feb14dacfdfa3f50372182736150",
       "5eff2a773b8b728083e5195b3183df1b9e12a03d"
     ],
-    "fix_year": 2026,
-    "tomcat_version": "11",
-    "also_tomcat_version": [
-      "10"
-    ]
+    "fix_year": 2026
   },
   {
     "cve_id": "CVE-2026-34500",
@@ -612,11 +450,7 @@
       "c13e60e732ea6d07087293a41ad1866c20848271",
       "29b56a56ce9e7d044b6162a99af0f38529b3a208"
     ],
-    "fix_year": 2026,
-    "tomcat_version": "11",
-    "also_tomcat_version": [
-      "10"
-    ]
+    "fix_year": 2026
   },
   {
     "cve_id": "CVE-2026-41284",
@@ -626,11 +460,7 @@
       "a96fffd18487a29c0a30d36f00cb2b2d91f6d42c",
       "b3d1c1c239142e806be0b7329d304b94a58913ed"
     ],
-    "fix_year": 2026,
-    "tomcat_version": "11",
-    "also_tomcat_version": [
-      "10"
-    ]
+    "fix_year": 2026
   },
   {
     "cve_id": "CVE-2026-41293",
@@ -644,11 +474,7 @@
       "f72a6174ab1f0f5a053435f80448b4f6837fe6d7",
       "2a2476460e823789f530a22207873ea8cd6eff3b"
     ],
-    "fix_year": 2026,
-    "tomcat_version": "11",
-    "also_tomcat_version": [
-      "10"
-    ]
+    "fix_year": 2026
   },
   {
     "cve_id": "CVE-2026-42498",
@@ -658,11 +484,7 @@
       "b7b173694d588ddcfa432f079baf763cbbbaa5c4",
       "6cbe274592ef2d11607b5b188e1df649de52f8d5"
     ],
-    "fix_year": 2026,
-    "tomcat_version": "11",
-    "also_tomcat_version": [
-      "10"
-    ]
+    "fix_year": 2026
   },
   {
     "cve_id": "CVE-2026-43512",
@@ -672,11 +494,7 @@
       "a99c355e8199adbfd67c9a1fffbd85b810b196cd",
       "3d4d3fae07a6cd9c2eb193c5491001740ec64448"
     ],
-    "fix_year": 2026,
-    "tomcat_version": "11",
-    "also_tomcat_version": [
-      "10"
-    ]
+    "fix_year": 2026
   },
   {
     "cve_id": "CVE-2026-43513",
@@ -686,11 +504,7 @@
       "83f3e51df7b87f5f6e626951c575ded1a512e8ef",
       "4a90d3fa93988c447cd5bb7482f76ff70d7f15c2"
     ],
-    "fix_year": 2026,
-    "tomcat_version": "11",
-    "also_tomcat_version": [
-      "10"
-    ]
+    "fix_year": 2026
   },
   {
     "cve_id": "CVE-2026-43514",
@@ -701,11 +515,7 @@
       "a102a2a157868ca51d83eaf5a119ccd9976a113e",
       "a90c358400c133b6173c6b26591923bf814a8508"
     ],
-    "fix_year": 2026,
-    "tomcat_version": "11",
-    "also_tomcat_version": [
-      "10"
-    ]
+    "fix_year": 2026
   },
   {
     "cve_id": "CVE-2026-43515",
@@ -716,10 +526,6 @@
       "0659748659ec75253fea5aac72cab6f94e79c419",
       "c621317382682206fb58ab92ebd3e1b6fdd10ce9"
     ],
-    "fix_year": 2026,
-    "tomcat_version": "11",
-    "also_tomcat_version": [
-      "10"
-    ]
+    "fix_year": 2026
   }
 ]
