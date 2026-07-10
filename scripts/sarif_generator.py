@@ -252,7 +252,7 @@ def build_sarif(cve_data: dict, start_line: int, end_line: int, snippet_lines: l
     }
 
 
-def main(fixes_dir: Path, sarif_dir: Path, tomcat_dir: Path | None = None, cve_ids: list[str] | None = None) -> None:
+def main(fixes_dir: Path, sarif_dir: Path, cve_ids: list[str] | None = None) -> None:
     sarif_dir.mkdir(parents=True, exist_ok=True)
     base_dir = Path(__file__).parent.parent
 
@@ -308,8 +308,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Generate SARIF 2.1.0 files from CVE markdown")
     parser.add_argument("--fixes-dir", type=Path, default=Path("fixes"))
     parser.add_argument("--sarif-dir", type=Path, default=Path("sarif"))
-    parser.add_argument("--tomcat-dir", type=Path, default=None, help="(unused, kept for backward compat)")
     parser.add_argument("--cve-ids", default=None, help="Comma-separated CVE IDs to process (default: all)")
     args = parser.parse_args()
     cve_ids = [c.strip() for c in args.cve_ids.split(',')] if args.cve_ids else None
-    main(args.fixes_dir, args.sarif_dir, args.tomcat_dir, cve_ids)
+    main(args.fixes_dir, args.sarif_dir, cve_ids)

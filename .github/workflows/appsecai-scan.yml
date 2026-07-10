@@ -20,9 +20,6 @@ permissions:
 jobs:
   analyze:
     runs-on: ubuntu-latest
-    env:
-      PROCESSING_MODE: group_cc
-      AUTO_CREATE_PRS: 'true'
 
     steps:
       - name: Checkout repository
