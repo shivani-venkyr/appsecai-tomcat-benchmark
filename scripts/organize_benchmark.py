@@ -247,6 +247,8 @@ def main(cve_id: str, fixes_dir: Path, candidates_path: Path, benchmark_dir: Pat
         "short_description": candidate.get("short_description", existing_meta.get("short_description", "")),
         "fix_year": candidate.get("fix_year", existing_meta.get("fix_year")),
         "pr_found": pr is not None,
+        "run_date": date.today().isoformat(),
+        "system_version": system_version,
     }
     meta_path.write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
     print(f"Wrote {cve_dir}/metadata.json")

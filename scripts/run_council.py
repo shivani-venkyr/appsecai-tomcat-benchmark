@@ -16,6 +16,7 @@ import json
 import re
 import subprocess
 import sys
+from datetime import date
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -196,7 +197,7 @@ def already_judged(cve_dir: Path, pr_num: int | None) -> bool:
     return "council" in json.loads(verdict_path.read_text())
 
 
-def update_verdict(cve_dir: Path, pr_num: int | None, council_result: dict, run_date: str | None = None) -> None:
+def update_verdict(cve_dir: Path, pr_num: int | None, council_result: dict, run_date: str) -> None:
     if pr_num is None:
         return
     verdict_path = cve_dir / "appsec_fixes" / f"pr_{pr_num}_verdict.json"
@@ -275,7 +276,7 @@ def process_file(path: Path) -> None:
                 "disagreements": raw.get("disagreements", []),
                 "experts": {k: v.get("answer", "") for k, v in raw.get("_experts", {}).items()},
             }
-            update_verdict(cve_dir, pr_num, result)
+            update_verdict(cve_dir, pr_num, result, run_date=date.today().isoformat())
             print(f"{classification} ({result['confidence']} confidence)")
         except Exception as e:
             print(f"ERROR: {e}")
