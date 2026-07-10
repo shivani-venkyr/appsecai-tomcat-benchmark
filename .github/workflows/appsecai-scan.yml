@@ -193,6 +193,21 @@ jobs:
               || echo "WARNING: generate_comparison failed for $cve, continuing"
           done
 
+      - name: Run council of experts
+        if: steps.resolve-cves.outputs.has_cves == 'true'
+        env:
+          CVE_LIST: ${{ steps.resolve-cves.outputs.cve_list }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          CODEX_AUTH_JSON: ${{ secrets.CODEX_AUTH_JSON }}
+        run: |
+          mkdir -p ~/.codex
+          echo "$CODEX_AUTH_JSON" > ~/.codex/auth.json
+          for cve in $(echo "$CVE_LIST" | tr ',' ' '); do
+            [[ "$cve" =~ ^CVE-[0-9]{4}-[0-9]+$ ]] || { echo "Skipping invalid token: $cve"; continue; }
+            python scripts/run_council.py "$cve" \
+              || echo "WARNING: run_council failed for $cve, continuing"
+          done
+
       - name: Commit and push all generated files
         if: success() && steps.resolve-cves.outputs.has_cves == 'true'
         env:
