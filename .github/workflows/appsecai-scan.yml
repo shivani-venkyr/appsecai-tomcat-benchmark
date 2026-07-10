@@ -35,12 +35,7 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Install Python dependencies
-        run: pip install anthropic
-
       - name: Install AI CLIs for council
-        # claude and codex CLIs are called by the vendored council_of_experts library.
-        # They authenticate via ANTHROPIC_API_KEY and OPENAI_API_KEY env vars.
         run: |
           npm install -g @anthropic-ai/claude-code
           npm install -g @openai/codex
@@ -102,7 +97,7 @@ jobs:
       - name: Generate fix markdowns via Claude
         if: steps.resolve-cves.outputs.has_cves == 'true'
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           CVE_LIST: ${{ steps.resolve-cves.outputs.cve_list }}
         run: |
           for cve in $(echo "$CVE_LIST" | tr ',' ' '); do
@@ -197,7 +192,7 @@ jobs:
         if: steps.resolve-cves.outputs.has_cves == 'true'
         env:
           CVE_LIST: ${{ steps.resolve-cves.outputs.cve_list }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           CODEX_AUTH_JSON: ${{ secrets.CODEX_AUTH_JSON }}
         run: |
           mkdir -p ~/.codex

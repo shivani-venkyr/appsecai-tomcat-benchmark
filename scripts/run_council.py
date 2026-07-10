@@ -66,7 +66,7 @@ EXPERT RESPONSES:
 
 def _call_claude(prompt: str, timeout: int = 600) -> str:
     proc = subprocess.run(
-        ["claude", "--bare", "-p"],
+        ["claude", "-p"],
         input=prompt, capture_output=True, text=True, timeout=timeout,
     )
     if proc.returncode != 0:

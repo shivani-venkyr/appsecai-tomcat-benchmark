@@ -16,9 +16,6 @@ import sys
 import tempfile
 from pathlib import Path
 
-import anthropic
-
-
 D1_THRESHOLDS = [10, 50, 200, 500]
 
 
@@ -172,13 +169,13 @@ Changing to `parameterCount >= limit` with a post-increment enforces the boundar
 
 
 def call_claude(prompt: str) -> str:
-    client = anthropic.Anthropic()
-    message = client.messages.create(
-        model="claude-sonnet-4-6",
-        max_tokens=4096,
-        messages=[{"role": "user", "content": prompt}],
+    proc = subprocess.run(
+        ["claude", "-p", "--model", "claude-sonnet-4-6"],
+        input=prompt, capture_output=True, text=True, timeout=600,
     )
-    return message.content[0].text
+    if proc.returncode != 0:
+        raise RuntimeError(f"claude failed rc={proc.returncode}: {proc.stderr.strip()[:300]}")
+    return proc.stdout.strip()
 
 
 def main(
