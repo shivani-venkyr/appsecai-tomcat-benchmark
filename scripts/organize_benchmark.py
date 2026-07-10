@@ -178,8 +178,6 @@ def main(cve_id: str, fixes_dir: Path, candidates_path: Path, benchmark_dir: Pat
     if candidate is None:
         print(f"  WARNING: {cve_id} not found in {candidates_path} — candidate fields will be empty")
         candidate = {}
-    version = candidate.get("tomcat_version", "unknown")
-
     # Create folder structure
     cve_dir = benchmark_dir / cwe / cve_id
     fixes_out_dir = cve_dir / "appsec_fixes"
@@ -251,8 +249,6 @@ def main(cve_id: str, fixes_dir: Path, candidates_path: Path, benchmark_dir: Pat
         "short_description": candidate.get("short_description", existing_meta.get("short_description", "")),
         "fix_commits": candidate.get("fix_commits", existing_meta.get("fix_commits", [])),
         "fix_year": candidate.get("fix_year", existing_meta.get("fix_year")),
-        "tomcat_version": version,
-        "also_tomcat_version": candidate.get("also_tomcat_version", existing_meta.get("also_tomcat_version", [])),
         # Track pipeline state — used by list_pending_cves to detect incomplete entries
         "submitted_to_appsecai": True,  # always True: organize_benchmark runs after the AppSecAI action
         "pr_found": pr is not None,
