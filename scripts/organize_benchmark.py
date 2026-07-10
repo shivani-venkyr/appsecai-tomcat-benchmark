@@ -247,11 +247,9 @@ def main(cve_id: str, fixes_dir: Path, candidates_path: Path, benchmark_dir: Pat
         "affected_component": parsed.get("affected_component", ""),
         # From cve_candidates.json
         "short_description": candidate.get("short_description", existing_meta.get("short_description", "")),
-        "fix_commits": candidate.get("fix_commits", existing_meta.get("fix_commits", [])),
         "fix_year": candidate.get("fix_year", existing_meta.get("fix_year")),
         "pr_found": pr is not None,
     }
-    metadata.pop("fix_commit", None)  # remove old singular key if present from previous runs
     meta_path.write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
     print(f"Wrote {cve_dir}/metadata.json")
 
