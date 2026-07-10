@@ -2,8 +2,9 @@
 """
 Run Council of Experts on CVE comparison files.
 
-Reads benchmark/**/comparison.md, calls `council ask --json` for each AI fix section,
-and updates benchmark/CWE/CVE/appsec_fixes/pr_NN_verdict.json with a `council` block.
+Calls claude and codex CLIs directly (no vendor library).
+Reads benchmark/**/comparison.md and updates
+benchmark/CWE/CVE/appsec_fixes/pr_NN_verdict.json with a council block.
 
 Usage:
     python3 scripts/run_council.py              # all CVEs
@@ -13,15 +14,11 @@ Usage:
 import argparse
 import json
 import re
+import subprocess
 import sys
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-
-def _ensure_council_importable() -> None:
-    """Add vendor/ to sys.path so council_of_experts is importable without installation."""
-    vendor = Path(__file__).parent.parent / "vendor"
-    if str(vendor) not in sys.path:
-        sys.path.insert(0, str(vendor))
 
 PROMPT_TEMPLATE = """\
 You are evaluating an AI-generated security fix against the correct human fix for a real CVE in Apache Tomcat.
@@ -45,56 +42,88 @@ then explain: what the AI fix got right, what it missed or got wrong, and how it
 End with a confidence level (High / Medium / Low).\
 """
 
+ARBITER_PROMPT = """\
+You are the chair of a review council. Two expert reviewers independently answered the same question.
+Reconcile their responses into one consensus. Where they agree, keep the shared answer.
+Where they differ, make the best-supported call and document the disagreement.
 
-def parse_comparison_file(path: Path) -> tuple[dict, str, list[dict]]:
-    """
-    Returns:
-        meta: {cve_id, cwe, severity}
-        human_fix: str
-        ai_fixes: list of {pr_label, pr_num, content}
-    """
-    text = path.read_text(encoding="utf-8")
-    sections = re.split(r'\n(?=## )', text)
+Return STRICT JSON only (no markdown fences) matching:
+{
+  "consensus": {
+    "answer": "<full answer; markdown allowed>",
+    "key_points": ["<key point>"],
+    "confidence": "high|medium|low"
+  },
+  "disagreements": [
+    {"topic": "<topic>", "positions": {"claude": "<stance>", "codex": "<stance>"},
+     "ruling": "kept|dropped|merged", "rationale": "<why>"}
+  ]
+}
 
-    header = sections[0]
-    meta_m = re.search(
-        r'\*\*CVE:\*\*\s*(CVE-[\w-]+).*?\*\*CWE:\*\*\s*(CWE-\d+[^|]+?)\s*\|.*?\*\*Severity:\*\*\s*(\w+)',
-        header
+EXPERT RESPONSES:
+"""
+
+
+def _call_claude(prompt: str, timeout: int = 600) -> str:
+    proc = subprocess.run(
+        ["claude", "--bare", "-p"],
+        input=prompt, capture_output=True, text=True, timeout=timeout,
     )
-    if not meta_m:
-        raise ValueError(f"Could not parse metadata from {path}")
+    if proc.returncode != 0:
+        raise RuntimeError(f"claude failed rc={proc.returncode}: {proc.stderr.strip()[:300]}")
+    return proc.stdout.strip()
 
-    meta = {
-        "cve_id": meta_m.group(1).strip(),
-        "cwe": meta_m.group(2).strip(),
-        "severity": meta_m.group(3).strip(),
-    }
 
-    human_fix = ""
-    ai_fixes = []
+def _call_codex(prompt: str, timeout: int = 600) -> str:
+    proc = subprocess.run(
+        ["codex", "exec", "--skip-git-repo-check", "--json", "-s", "read-only", "-"],
+        input=prompt, capture_output=True, text=True, timeout=timeout,
+    )
+    if proc.returncode != 0:
+        err = _extract_codex_error(proc.stdout) or proc.stderr.strip()
+        raise RuntimeError(f"codex exec failed rc={proc.returncode}: {err[:300]}")
+    return _extract_codex_message(proc.stdout)
 
-    for section in sections[1:]:
-        if section.startswith("## Human Fix"):
-            human_fix = section[len("## Human Fix"):].strip()
-        elif section.startswith("## AI Fix"):
-            header_line = section.splitlines()[0]
-            pr_m = re.search(r'PR #(\d+)', header_line)
-            pr_num = int(pr_m.group(1)) if pr_m else None
-            pr_label = f" PR #{pr_m.group(1)}" if pr_m else ""
-            content = "\n".join(section.splitlines()[1:]).strip()
-            ai_fixes.append({"pr_label": pr_label, "pr_num": pr_num, "content": content})
 
-    return meta, human_fix, ai_fixes
+def _extract_codex_message(ndjson: str) -> str:
+    for line in ndjson.splitlines():
+        try:
+            obj = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        item = obj.get("item") or {}
+        if obj.get("type") == "item.completed" and item.get("type") == "agent_message":
+            text = item.get("text")
+            if text:
+                return text
+    raise ValueError("codex: no agent_message in output")
+
+
+def _extract_codex_error(ndjson: str) -> str:
+    msgs = []
+    for line in ndjson.splitlines():
+        try:
+            obj = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        item = obj.get("item") or {}
+        if obj.get("type") == "error" and obj.get("message"):
+            msgs.append(obj["message"])
+        elif obj.get("type") == "turn.failed":
+            msgs.append((obj.get("error") or {}).get("message", "turn.failed"))
+        elif item.get("type") == "error" and item.get("message"):
+            msgs.append(item["message"])
+    return "; ".join(msgs)[:500]
+
+
+def _parse_json(text: str) -> dict:
+    m = re.search(r"\{.*\}", text, re.DOTALL)
+    if not m:
+        raise ValueError(f"no JSON in response: {text[:200]}")
+    return json.loads(m.group(0))
 
 
 def run_council(prompt: str) -> dict:
-    _ensure_council_importable()
-    from council_of_experts.consensus import run_council as _run_council
-    from council_of_experts.experts.claude import ClaudeExpert
-    from council_of_experts.experts.codex import CodexExpert
-
-    # The council CLI wraps prompts with a JSON shape so experts return structured
-    # output. Replicate that here so the consensus has answer/key_points/confidence.
     shape = {
         "answer": "<your full answer; markdown allowed>",
         "key_points": ["<key point>"],
@@ -106,63 +135,77 @@ def run_council(prompt: str) -> dict:
         f"{json.dumps(shape, indent=2)}"
     )
 
-    merged, status = _run_council(
-        wrapped,
-        experts=[ClaudeExpert(timeout=600), CodexExpert(timeout=600)],
-        log=print,
-    )
+    experts: dict[str, dict] = {}
 
-    if status.get("degraded"):
-        for name, outcome in status.get("experts", {}).items():
-            if outcome != "ok":
-                print(f"  WARNING: council expert '{name}' {outcome}")
+    def _ask_claude() -> None:
+        try:
+            experts["claude"] = _parse_json(_call_claude(wrapped))
+            print("  council expert 'claude': ok")
+        except Exception as e:
+            print(f"  council expert 'claude' FAILED: {str(e)[:300]}")
 
-    if merged is None:
-        raise RuntimeError(f"All council experts failed: {status['experts']}")
+    def _ask_codex() -> None:
+        try:
+            experts["codex"] = _parse_json(_call_codex(wrapped))
+            print("  council expert 'codex': ok")
+        except Exception as e:
+            print(f"  council expert 'codex' FAILED: {str(e)[:300]}")
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        pool.map(lambda f: f(), [_ask_claude, _ask_codex])
+
+    if not experts:
+        raise RuntimeError("All council experts failed")
+
+    if len(experts) == 1:
+        name = next(iter(experts))
+        print(f"  council: single expert ({name}) — consensus skipped (degraded)")
+        return {"consensus": experts[name], "disagreements": [], "_experts": experts}
+
+    # Arbiter: Claude reconciles both responses
+    arb_input = ARBITER_PROMPT + json.dumps(experts)
+    try:
+        merged = _parse_json(_call_claude(arb_input))
+        if "consensus" not in merged:
+            disagreements = merged.pop("disagreements", [])
+            merged = {"consensus": merged, "disagreements": disagreements}
+        n_dis = len(merged.get("disagreements") or [])
+        print(f"  council: consensus over {list(experts)} -> {n_dis} disagreement(s)")
+    except Exception as e:
+        print(f"  council: arbiter failed ({str(e)[:150]}) — using claude response")
+        merged = {"consensus": experts["claude"], "disagreements": []}
+
+    merged["_experts"] = experts
     return merged
 
 
 def extract_classification(answer: str) -> str:
-    # Anchor to the start — the prompt instructs the council to open with the verdict word
     m = re.match(r'\s*(Accepted|Rejected)\b', answer.strip(), re.IGNORECASE)
     if m:
         return m.group(1).capitalize()
-    # Fallback: scan for first occurrence (older responses or format drift)
     m = re.search(r'\b(Accepted|Rejected)\b', answer, re.IGNORECASE)
     return m.group(1).capitalize() if m else "Unknown"
 
 
 def already_judged(cve_dir: Path, pr_num: int | None) -> bool:
-    """Return True if this PR's verdict.json already has a council block."""
     if pr_num is None:
         return False
     verdict_path = cve_dir / "appsec_fixes" / f"pr_{pr_num}_verdict.json"
     if not verdict_path.exists():
         return False
-    verdict = json.loads(verdict_path.read_text())
-    return "council" in verdict
+    return "council" in json.loads(verdict_path.read_text())
 
 
 def update_verdict(cve_dir: Path, pr_num: int | None, council_result: dict, run_date: str | None = None) -> None:
-    """Merge council data into pr_NN_verdict.json, creating the file if needed."""
     if pr_num is None:
         return
-
     verdict_path = cve_dir / "appsec_fixes" / f"pr_{pr_num}_verdict.json"
     verdict_path.parent.mkdir(parents=True, exist_ok=True)
-
     if verdict_path.exists():
         verdict = json.loads(verdict_path.read_text())
     else:
-        verdict = {
-            "pr_number": pr_num,
-            "pr_url": None,
-            "date": run_date,
-            "system_version": None,
-            "status": "pr_created",
-            "human_verdict": None,
-        }
-
+        verdict = {"pr_number": pr_num, "pr_url": None, "date": run_date,
+                   "system_version": None, "status": "pr_created", "human_verdict": None}
     verdict["council"] = {
         "classification": council_result["classification"],
         "confidence": council_result["confidence"],
@@ -171,8 +214,37 @@ def update_verdict(cve_dir: Path, pr_num: int | None, council_result: dict, run_
         "disagreements": council_result["disagreements"],
         "experts": council_result["experts"],
     }
-
     verdict_path.write_text(json.dumps(verdict, indent=2, ensure_ascii=False) + "\n")
+
+
+def parse_comparison_file(path: Path) -> tuple[dict, str, list[dict]]:
+    text = path.read_text(encoding="utf-8")
+    sections = re.split(r'\n(?=## )', text)
+    header = sections[0]
+    meta_m = re.search(
+        r'\*\*CVE:\*\*\s*(CVE-[\w-]+).*?\*\*CWE:\*\*\s*(CWE-\d+[^|]+?)\s*\|.*?\*\*Severity:\*\*\s*(\w+)',
+        header
+    )
+    if not meta_m:
+        raise ValueError(f"Could not parse metadata from {path}")
+    meta = {
+        "cve_id": meta_m.group(1).strip(),
+        "cwe": meta_m.group(2).strip(),
+        "severity": meta_m.group(3).strip(),
+    }
+    human_fix = ""
+    ai_fixes = []
+    for section in sections[1:]:
+        if section.startswith("## Human Fix"):
+            human_fix = section[len("## Human Fix"):].strip()
+        elif section.startswith("## AI Fix"):
+            header_line = section.splitlines()[0]
+            pr_m = re.search(r'PR #(\d+)', header_line)
+            pr_num = int(pr_m.group(1)) if pr_m else None
+            pr_label = f" PR #{pr_m.group(1)}" if pr_m else ""
+            content = "\n".join(section.splitlines()[1:]).strip()
+            ai_fixes.append({"pr_label": pr_label, "pr_num": pr_num, "content": content})
+    return meta, human_fix, ai_fixes
 
 
 def process_file(path: Path) -> None:
@@ -182,23 +254,15 @@ def process_file(path: Path) -> None:
         print(f"ERROR: could not parse {path}: {e}")
         return
     cve_dir = path.parent
-
     for fix in ai_fixes:
         pr_num = fix["pr_num"]
-
         if already_judged(cve_dir, pr_num):
             print(f"  {meta['cve_id']}{fix['pr_label']} ... already judged, skipping")
             continue
-
         prompt = PROMPT_TEMPLATE.format(
-            cve_id=meta["cve_id"],
-            cwe=meta["cwe"],
-            severity=meta["severity"],
-            human_fix=human_fix,
-            pr_label=fix["pr_label"],
-            ai_fix=fix["content"],
+            cve_id=meta["cve_id"], cwe=meta["cwe"], severity=meta["severity"],
+            human_fix=human_fix, pr_label=fix["pr_label"], ai_fix=fix["content"],
         )
-
         print(f"  {meta['cve_id']}{fix['pr_label']} ... ", end="", flush=True)
         try:
             raw = run_council(prompt)
@@ -222,10 +286,8 @@ def main() -> None:
     parser.add_argument("cve_id", nargs="?", default=None, help="Single CVE to process")
     parser.add_argument("--benchmark-dir", type=Path, default=Path("benchmark"))
     args = parser.parse_args()
-
     benchmark_dir = args.benchmark_dir
     target = args.cve_id
-
     if target:
         files = sorted(benchmark_dir.glob("*/CVE-*/comparison.md"))
         files = [f for f in files if target == f.parent.name]
@@ -234,12 +296,9 @@ def main() -> None:
             sys.exit(0)
     else:
         files = sorted(benchmark_dir.glob("*/CVE-*/comparison.md"))
-
     print(f"Running council on {len(files)} CVE(s)...\n")
-
     for path in files:
         process_file(path)
-
     print("\nDone.")
 
 
