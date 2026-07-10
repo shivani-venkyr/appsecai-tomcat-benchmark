@@ -249,8 +249,6 @@ def main(cve_id: str, fixes_dir: Path, candidates_path: Path, benchmark_dir: Pat
         "short_description": candidate.get("short_description", existing_meta.get("short_description", "")),
         "fix_commits": candidate.get("fix_commits", existing_meta.get("fix_commits", [])),
         "fix_year": candidate.get("fix_year", existing_meta.get("fix_year")),
-        # Track pipeline state — used by list_pending_cves to detect incomplete entries
-        "submitted_to_appsecai": True,  # always True: organize_benchmark runs after the AppSecAI action
         "pr_found": pr is not None,
     }
     metadata.pop("fix_commit", None)  # remove old singular key if present from previous runs

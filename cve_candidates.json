@@ -56,6 +56,15 @@
     ]
   },
   {
+    "cve_id": "CVE-2023-41080",
+    "severity": "Moderate",
+    "short_description": "Apache Tomcat open redirect in form authentication",
+    "fix_commits": [
+      "e3703c9a"
+    ],
+    "fix_year": 2023
+  },
+  {
     "cve_id": "CVE-2023-42795",
     "severity": "High",
     "short_description": "Information Disclosure",
@@ -503,6 +512,16 @@
     ]
   },
   {
+    "cve_id": "CVE-2026-24880",
+    "severity": "Low",
+    "short_description": "Apache Tomcat HTTP request smuggling via chunked encoding",
+    "fix_commits": [
+      "fde1a823",
+      "2cb06c34"
+    ],
+    "fix_year": 2026
+  },
+  {
     "cve_id": "CVE-2026-25854",
     "severity": "Low",
     "short_description": "Occasionally open redirect",
@@ -561,6 +580,15 @@
       "10",
       "10"
     ]
+  },
+  {
+    "cve_id": "CVE-2026-34483",
+    "severity": "Low",
+    "short_description": "Apache Tomcat log injection via access log URI",
+    "fix_commits": [
+      "f9ddc24f"
+    ],
+    "fix_year": 2026
   },
   {
     "cve_id": "CVE-2026-34487",
