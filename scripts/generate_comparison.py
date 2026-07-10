@@ -62,7 +62,6 @@ def parse_fix_markdown(md_path: Path) -> dict:
                     current_lines.append(line)
     data["after_blocks"] = after_blocks
     data["after_file"] = after_blocks[0]["file"] if after_blocks else ""
-    data["after_lines"] = after_blocks[0]["lines"] if after_blocks else []
     return data
 
 
