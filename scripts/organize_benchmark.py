@@ -28,6 +28,30 @@ from datetime import date
 from pathlib import Path
 
 
+_EXT_TO_LANG = {
+    ".java": "Java",
+    ".py": "Python",
+    ".js": "JavaScript",
+    ".ts": "TypeScript",
+    ".go": "Go",
+    ".rb": "Ruby",
+    ".php": "PHP",
+    ".cs": "C#",
+    ".cpp": "C++", ".cc": "C++", ".cxx": "C++",
+    ".c": "C",
+    ".swift": "Swift",
+    ".kt": "Kotlin",
+}
+
+
+def _detect_language(after_blocks: list[dict]) -> str:
+    for block in after_blocks:
+        lang = _EXT_TO_LANG.get(Path(block["file"]).suffix.lower())
+        if lang:
+            return lang
+    return "Unknown"
+
+
 def parse_fix_markdown(md_path: Path) -> dict:
     data = {}
     after_blocks: list[dict] = []
@@ -217,6 +241,7 @@ def main(cve_id: str, fixes_dir: Path, candidates_path: Path, benchmark_dir: Pat
         **existing_meta,
         # Re-parsed from markdown
         "cve_id": cve_id,
+        "language": _detect_language(parsed.get("after_blocks", [])),
         "cwe": cwe,
         "cwe_description": parsed.get("cwe_description", existing_meta.get("cwe_description", "")),
         "severity": parsed.get("severity", ""),
