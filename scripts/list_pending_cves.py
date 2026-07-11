@@ -1,10 +1,9 @@
 """
 List CVEs that have a fix markdown but no complete benchmark entry.
 
-A CVE is "complete" when its benchmark/CWE/CVE/metadata.json exists AND
-pr_found is True.  If pr_found is absent (entries written before this field
-was added) we default to True for backward compatibility — those entries are
-assumed complete.
+A CVE is "complete" when its most recent run in metadata.json has pr_found=True.
+CVEs whose latest run missed (pr_found=False) are returned so generate_comparison.py
+can re-attempt them on the next AppSecAI run.
 
 Can be imported as a module or run as a CLI tool.
 """
@@ -24,9 +23,9 @@ def list_pending_cves(fixes_dir: Path, benchmark_dir: Path) -> list[str]:
         try:
             meta = json.loads(meta_path.read_text(encoding="utf-8"))
         except Exception:
-            meta = {}
-        # pr_found absent → old entry, treat as complete (backward compat)
-        if meta.get("pr_found", True):
+            continue
+        runs = meta.get("runs", [])
+        if runs and runs[-1].get("pr_found", False):
             complete.add(meta_path.parent.name)
 
     return sorted(has_fix - complete)

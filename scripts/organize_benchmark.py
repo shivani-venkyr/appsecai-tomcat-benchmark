@@ -6,10 +6,10 @@ Structure produced:
       CWE-NNN/
         CVE-XXXX-XXXXX/
           metadata.json
-          human_fix.md
+          all_fixes.md          (written by generate_comparison.py)
           verdicts/
-            pr_NN.diff
             pr_NN_verdict.json
+            run_YYYY-MM-DD_N_verdict.json  (no-PR runs)
 
 Usage:
     python scripts/organize_benchmark.py \
