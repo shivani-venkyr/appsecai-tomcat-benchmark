@@ -186,9 +186,8 @@ def main(cve_id: str, fixes_dir: Path, candidates_path: Path, benchmark_dir: Pat
         verdict: dict = {
             "pr_number": pr_number,
             "pr_url": pr["url"],
-            "date": date.today().isoformat(),
+            "run_date": date.today().isoformat(),
             "system_version": system_version,
-            "status": "pr_created",
             "human_verdict": existing_verdict.get("human_verdict"),
         }
         if "council" in existing_verdict:
@@ -196,7 +195,19 @@ def main(cve_id: str, fixes_dir: Path, candidates_path: Path, benchmark_dir: Pat
         verdict_path.write_text(json.dumps(verdict, indent=2) + "\n", encoding="utf-8")
         print(f"Wrote {fixes_out_dir}/pr_{pr_number}_verdict.json")
     else:
-        print("No AppSecAI PR found — verdicts/ left empty")
+        # Write a Missed verdict with a counter suffix to avoid same-day collisions
+        today = date.today().isoformat()
+        counter = 1
+        while (fixes_out_dir / f"run_{today}_{counter}_verdict.json").exists():
+            counter += 1
+        missed_path = fixes_out_dir / f"run_{today}_{counter}_verdict.json"
+        missed_verdict = {
+            "run_date": today,
+            "system_version": system_version,
+            "classification": "Missed",
+        }
+        missed_path.write_text(json.dumps(missed_verdict, indent=2) + "\n", encoding="utf-8")
+        print(f"Wrote {missed_path}")
 
     # Write metadata.json after PR lookup so runs reflects the actual outcome.
     meta_path = cve_dir / "metadata.json"

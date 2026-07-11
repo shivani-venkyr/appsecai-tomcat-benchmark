@@ -205,8 +205,8 @@ def update_verdict(cve_dir: Path, pr_num: int | None, council_result: dict, run_
     if verdict_path.exists():
         verdict = json.loads(verdict_path.read_text())
     else:
-        verdict = {"pr_number": pr_num, "pr_url": None, "date": run_date,
-                   "system_version": None, "status": "pr_created", "human_verdict": None}
+        verdict = {"pr_number": pr_num, "pr_url": None, "run_date": run_date,
+                   "system_version": None, "human_verdict": None}
     verdict["council"] = {
         "classification": council_result["classification"],
         "confidence": council_result["confidence"],
