@@ -226,18 +226,24 @@ def main(cve_id: str, fixes_dir: Path, candidates_path: Path, benchmark_dir: Pat
         verdict_path.write_text(json.dumps(verdict, indent=2) + "\n", encoding="utf-8")
         print(f"Wrote {fixes_out_dir}/pr_{pr_number}_verdict.json")
     else:
-        print("No AppSecAI PR found — appsec_fixes/ left empty")
+        print("No AppSecAI PR found")
 
-    # Write metadata.json after PR lookup so pr_found reflects the actual outcome.
-    # Fields from the fix markdown override stale values; rich fields from
-    # cve_candidates.json or the existing file are preserved.
-    meta_path = cve_dir / "metadata.json"
-    existing_meta = json.loads(meta_path.read_text(encoding="utf-8")) if meta_path.exists() else {}
-    new_run = {
+    # Append this run to run_log.json regardless of whether a PR was found
+    run_log_path = fixes_out_dir / "run_log.json"
+    existing_log = json.loads(run_log_path.read_text(encoding="utf-8")) if run_log_path.exists() else []
+    new_run: dict = {
         "run_date": date.today().isoformat(),
         "system_version": system_version,
         "pr_found": pr is not None,
     }
+    if pr is not None:
+        new_run["pr_number"] = pr["number"]
+    run_log_path.write_text(json.dumps(existing_log + [new_run], indent=2) + "\n", encoding="utf-8")
+    print(f"Wrote {fixes_out_dir}/run_log.json")
+
+    # Write metadata.json — CVE characteristics only, no run history (that lives in run_log.json)
+    meta_path = cve_dir / "metadata.json"
+    existing_meta = json.loads(meta_path.read_text(encoding="utf-8")) if meta_path.exists() else {}
     metadata = {
         **existing_meta,
         # Re-parsed from markdown
@@ -251,8 +257,8 @@ def main(cve_id: str, fixes_dir: Path, candidates_path: Path, benchmark_dir: Pat
         # From cve_candidates.json
         "short_description": candidate.get("short_description", existing_meta.get("short_description", "")),
         "fix_year": candidate.get("fix_year", existing_meta.get("fix_year")),
-        "runs": existing_meta.get("runs", []) + [new_run],
     }
+    metadata.pop("runs", None)
     meta_path.write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
     print(f"Wrote {cve_dir}/metadata.json")
 
