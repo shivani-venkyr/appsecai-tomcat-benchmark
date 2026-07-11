@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       cve_id:
-        description: 'CVE to run (e.g. CVE-2023-28709). Leave blank to run all unsubmitted CVEs.'
+        description: 'CVE(s) to run — single ID or comma-separated list (e.g. CVE-2023-28709,CVE-2024-38286). Leave blank to run all unsubmitted CVEs.'
         required: false
         default: ''
 
@@ -61,15 +61,19 @@ jobs:
           from list_pending_cves import list_pending_cves
 
           CVE_RE = re.compile(r'^CVE-\d{4}-\d+$')
-          cve_id = os.environ.get('CVE_INPUT', '').strip()
+          raw_input = os.environ.get('CVE_INPUT', '').strip()
 
-          if cve_id:
-              if not CVE_RE.match(cve_id):
-                  print(f"ERROR: invalid CVE ID format: {cve_id!r}", file=sys.stderr)
+          if raw_input:
+              cves = [c.strip() for c in raw_input.split(',') if c.strip()]
+              invalid = [c for c in cves if not CVE_RE.match(c)]
+              if invalid:
+                  print(f"ERROR: invalid CVE ID format: {invalid}", file=sys.stderr)
                   sys.exit(1)
-              # Warn if this CVE already has a complete benchmark entry
-              for meta_path in Path('benchmark').glob('*/CVE-*/metadata.json'):
-                  if meta_path.parent.name == cve_id:
+              # Warn if any CVE already has a complete benchmark entry
+              meta_index = {p.parent.name: p for p in Path('benchmark').glob('*/CVE-*/metadata.json')}
+              for cve_id in cves:
+                  meta_path = meta_index.get(cve_id)
+                  if meta_path:
                       try:
                           meta = json.loads(meta_path.read_text())
                           runs = meta.get('runs', [])
@@ -77,7 +81,6 @@ jobs:
                               print(f"WARNING: {cve_id} already has a complete benchmark entry — re-running may create a duplicate AppSecAI PR")
                       except Exception:
                           pass
-              cves = [cve_id]
           else:
               cves = list_pending_cves(Path('fixes'), Path('benchmark'))
 
