@@ -72,7 +72,8 @@ jobs:
                   if meta_path.parent.name == cve_id:
                       try:
                           meta = json.loads(meta_path.read_text())
-                          if meta.get('pr_found', True):
+                          runs = meta.get('runs', [])
+                          if runs and runs[-1].get('pr_found', False):
                               print(f"WARNING: {cve_id} already has a complete benchmark entry — re-running may create a duplicate AppSecAI PR")
                       except Exception:
                           pass
@@ -168,7 +169,7 @@ jobs:
               || echo "WARNING: organize_benchmark failed for $cve, continuing"
           done
 
-      - name: Generate comparison markdowns
+      - name: Generate all_fixes.md files
         if: steps.resolve-cves.outputs.has_cves == 'true'
         env:
           CVE_LIST: ${{ steps.resolve-cves.outputs.cve_list }}
