@@ -13,96 +13,13 @@ Usage:
 """
 
 import argparse
-import json
 import re
 import subprocess
 import sys
 from pathlib import Path
 
 from list_pending_cves import list_pending_cves
-
-
-def parse_fix_markdown(md_path: Path) -> dict:
-    data = {}
-    after_blocks: list[dict] = []
-    current_file = ""
-    current_lines: list[str] = []
-    state = "TABLE"
-    with open(md_path, encoding="utf-8") as f:
-        for line in f:
-            line = line.rstrip("\n")
-            if state == "TABLE":
-                m = re.match(r'\|\s*\*\*(.+?)\*\*\s*\|\s*(.+?)\s*\|', line)
-                if m:
-                    field, value = m.group(1), m.group(2)
-                    if field == "CVE ID":
-                        data["cve_id"] = value
-                    elif field == "CWE":
-                        data["cwe_full"] = value
-                        cwe_m = re.search(r'CWE-\d+', value)
-                        data["cwe_id"] = cwe_m.group(0) if cwe_m else value
-                    elif field == "Severity":
-                        data["severity"] = value
-                elif line.startswith("## After"):
-                    state = "SCAN_AFTER_PATH"
-            elif state == "SCAN_AFTER_PATH":
-                stripped = line.strip()
-                if stripped.startswith("## ") and not stripped.startswith("## After"):
-                    break  # left the After section
-                m = re.match(r'^`([^`]+\.java)`', stripped)
-                if m:
-                    current_file = m.group(1)
-                elif re.match(r'^```', stripped) and current_file:
-                    current_lines = []
-                    state = "IN_AFTER"
-            elif state == "IN_AFTER":
-                if line.strip() == "```":
-                    after_blocks.append({"file": current_file, "lines": current_lines})
-                    current_file = ""
-                    current_lines = []
-                    state = "SCAN_AFTER_PATH"
-                else:
-                    current_lines.append(line)
-    data["after_blocks"] = after_blocks
-    data["after_file"] = after_blocks[0]["file"] if after_blocks else ""
-    return data
-
-
-def find_appsecai_pr(cve_id: str, repo: str, file_path: str | None = None) -> dict | None:
-    result = subprocess.run(
-        ["gh", "pr", "list", "--repo", repo, "--state", "all",
-         "--json", "number,url,headRefName,title,body,createdAt", "--limit", "500"],
-        capture_output=True, text=True,
-    )
-    if result.returncode != 0:
-        print(f"  WARNING: gh pr list failed: {result.stderr.strip()}")
-        return None
-    prs = json.loads(result.stdout)
-    appsecai_prs = [p for p in prs if p["headRefName"].startswith("appsecai/fix-group/")]
-
-    # 1. CVE ID in title (most reliable — works for single-CVE PRs)
-    matches = [p for p in appsecai_prs if cve_id in p["title"]]
-    if matches:
-        matches.sort(key=lambda p: p["createdAt"], reverse=True)
-        return matches[0]
-
-    # 2. CVE ID in PR body (grouped PRs list each CVE in the description)
-    matches = [p for p in appsecai_prs if cve_id in (p.get("body") or "")]
-    if matches:
-        matches.sort(key=lambda p: p["createdAt"], reverse=True)
-        print(f"  (matched by CVE ID in PR body — grouped PR)")
-        return matches[0]
-
-    # 3. Filename in title (last resort — may match wrong PR if two CVEs share a file)
-    if file_path:
-        filename = Path(file_path).name
-        matches = [p for p in appsecai_prs if filename in p["title"]]
-        if matches:
-            matches.sort(key=lambda p: p["createdAt"], reverse=True)
-            print(f"  (matched by filename {filename!r} — verify this is the right PR)")
-            return matches[0]
-
-    return None
+from utils import find_appsecai_pr, parse_fix_markdown
 
 
 def fetch_pr_diff(pr_number: int, repo: str) -> str:
@@ -138,8 +55,8 @@ def process_cve(cve_id: str, fixes_dir: Path, benchmark_dir: Path, repo: str) ->
         return False
 
     data = parse_fix_markdown(md_path)
-    cwe_id = data.get("cwe_id", "CWE-UNKNOWN")
-    cwe_full = data.get("cwe_full", cwe_id)
+    cwe = data.get("cwe", "CWE-UNKNOWN")
+    cwe_full = data.get("cwe_full", cwe)
     severity = data.get("severity", "Unknown")
     after_file = data.get("after_file", "")
 
@@ -155,7 +72,7 @@ def process_cve(cve_id: str, fixes_dir: Path, benchmark_dir: Path, repo: str) ->
         return False
 
     java_diff = filter_java_diff(diff)
-    cve_dir = find_cve_dir(cve_id, cwe_id, benchmark_dir)
+    cve_dir = find_cve_dir(cve_id, cwe, benchmark_dir)
 
     # Render all After blocks (handles fixes touching multiple files)
     after_blocks = data.get("after_blocks", [])
