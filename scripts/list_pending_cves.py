@@ -2,7 +2,7 @@
 List CVEs that have a fix markdown but no complete benchmark entry.
 
 A CVE is "complete" when its most recent run in metadata.json has pr_found=True.
-CVEs whose latest run missed (pr_found=False) are returned so generate_comparison.py
+CVEs whose latest run missed (pr_found=False) are returned so generate_all_fixes.py
 can re-attempt them on the next AppSecAI run.
 
 Can be imported as a module or run as a CLI tool.

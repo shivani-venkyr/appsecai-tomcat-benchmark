@@ -8,8 +8,8 @@ exists but is missing the target PR, the new AI Fix section is appended and the
 header PR list is updated.
 
 Usage:
-    python scripts/generate_comparison.py --cve-id CVE-XXXX-XXXXX
-    python scripts/generate_comparison.py          # all CVEs with a fix but no all_fixes.md
+    python scripts/generate_all_fixes.py --cve-id CVE-XXXX-XXXXX
+    python scripts/generate_all_fixes.py          # all CVEs with a fix but no all_fixes.md
 """
 
 import argparse

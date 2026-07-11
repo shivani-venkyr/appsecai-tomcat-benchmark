@@ -6,7 +6,7 @@ Structure produced:
       CWE-NNN/
         CVE-XXXX-XXXXX/
           metadata.json
-          all_fixes.md          (written by generate_comparison.py)
+          all_fixes.md          (written by generate_all_fixes.py)
           verdicts/
             pr_NN_verdict.json
             run_YYYY-MM-DD_N_verdict.json  (no-PR runs)

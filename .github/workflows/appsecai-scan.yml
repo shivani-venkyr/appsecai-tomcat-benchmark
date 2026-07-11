@@ -176,12 +176,12 @@ jobs:
         run: |
           for cve in $(echo "$CVE_LIST" | tr ',' ' '); do
             [[ "$cve" =~ ^CVE-[0-9]{4}-[0-9]+$ ]] || { echo "Skipping invalid token: $cve"; continue; }
-            python scripts/generate_comparison.py \
+            python scripts/generate_all_fixes.py \
               --cve-id "$cve" \
               --repo "${{ github.repository }}" \
               --fixes-dir fixes \
               --benchmark-dir benchmark \
-              || echo "WARNING: generate_comparison failed for $cve, continuing"
+              || echo "WARNING: generate_all_fixes failed for $cve, continuing"
           done
 
       - name: Run council of experts
