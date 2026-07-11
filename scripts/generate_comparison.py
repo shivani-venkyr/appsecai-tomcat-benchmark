@@ -1,12 +1,15 @@
 """
-Generate comparison markdown files for council-of-experts review.
+Generate (or update) all_fixes.md files for council-of-experts review.
 
 Reads fixes/CVE-*_before_after.md (human fix) and fetches the AppSecAI PR diff,
-then writes benchmark/CWE-NNN/CVE-XXXX/comparison.md.
+then writes benchmark/CWE-NNN/CVE-XXXX/all_fixes.md.  If the file already
+exists and already contains the target PR, the run is skipped.  If the file
+exists but is missing the target PR, the new AI Fix section is appended and the
+header PR list is updated.
 
 Usage:
     python scripts/generate_comparison.py --cve-id CVE-XXXX-XXXXX
-    python scripts/generate_comparison.py          # all CVEs with a fix but no comparison
+    python scripts/generate_comparison.py          # all CVEs with a fix but no all_fixes.md
 """
 
 import argparse
@@ -167,7 +170,25 @@ def process_cve(cve_id: str, fixes_dir: Path, benchmark_dir: Path, repo: str) ->
     else:
         human_fix_section = "```java\n\n```"
 
-    content = f"""# {cve_id} Fix Comparison
+    ai_fix_section = f"## AI Fix (AppSecAI PR #{pr_number})\n\n```diff\n{java_diff}\n```\n"
+    out_path = cve_dir / "all_fixes.md"
+
+    if out_path.exists():
+        existing = out_path.read_text(encoding="utf-8")
+        if f"PR #{pr_number}" in existing:
+            print(f"  {cve_id}: PR #{pr_number} already in {out_path.name}, skipping")
+            return False
+        # Append new AI Fix section and update the header PR list
+        pr_header_re = re.compile(r'(\*\*PR:\*\* )([^\n]+)')
+        def _add_pr(m: re.Match) -> str:
+            return m.group(1) + m.group(2).rstrip() + f", #{pr_number}"
+        updated = pr_header_re.sub(_add_pr, existing, count=1)
+        updated = updated.rstrip("\n") + "\n\n" + ai_fix_section
+        out_path.write_text(updated, encoding="utf-8")
+        print(f"  {cve_id}: appended PR #{pr_number} to {out_path.name}")
+        return True
+
+    content = f"""# {cve_id} All Fixes
 
 **CVE:** {cve_id} | **CWE:** {cwe_full} | **Severity:** {severity} | **PR:** #{pr_number}
 
@@ -175,15 +196,9 @@ def process_cve(cve_id: str, fixes_dir: Path, benchmark_dir: Path, repo: str) ->
 
 {human_fix_section}
 
-## AI Fix (AppSecAI PR #{pr_number})
-
-```diff
-{java_diff}
-```
-"""
-    out_path = cve_dir / "comparison.md"
+{ai_fix_section}"""
     out_path.write_text(content, encoding="utf-8")
-    print(f"  {cve_id}: wrote {out_path} (PR #{pr_number})")
+    print(f"  {cve_id}: wrote {out_path.name} (PR #{pr_number})")
     return True
 
 
@@ -200,12 +215,12 @@ def main() -> None:
     else:
         cve_ids = list_pending_cves(args.fixes_dir, args.benchmark_dir)
 
-    print(f"Generating comparisons for {len(cve_ids)} CVE(s)...")
+    print(f"Processing {len(cve_ids)} CVE(s)...")
     count = sum(
         1 for cve_id in cve_ids
         if process_cve(cve_id, args.fixes_dir, args.benchmark_dir, args.repo)
     )
-    print(f"Done. Wrote {count} comparison file(s).")
+    print(f"Done. Updated {count} all_fixes.md file(s).")
 
 
 if __name__ == "__main__":

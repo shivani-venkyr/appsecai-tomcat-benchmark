@@ -3,7 +3,7 @@
 Run Council of Experts on CVE comparison files.
 
 Calls claude and codex CLIs directly (no vendor library).
-Reads benchmark/**/comparison.md and updates
+Reads benchmark/**/all_fixes.md and updates
 benchmark/CWE/CVE/appsec_fixes/pr_NN_verdict.json with a council block.
 
 Usage:
@@ -290,13 +290,13 @@ def main() -> None:
     benchmark_dir = args.benchmark_dir
     target = args.cve_id
     if target:
-        files = sorted(benchmark_dir.glob("*/CVE-*/comparison.md"))
+        files = sorted(benchmark_dir.glob("*/CVE-*/all_fixes.md"))
         files = [f for f in files if target == f.parent.name]
         if not files:
-            print(f"No comparison.md found for {target} in {benchmark_dir}/ — skipping")
+            print(f"No all_fixes.md found for {target} in {benchmark_dir}/ — skipping")
             sys.exit(0)
     else:
-        files = sorted(benchmark_dir.glob("*/CVE-*/comparison.md"))
+        files = sorted(benchmark_dir.glob("*/CVE-*/all_fixes.md"))
     print(f"Running council on {len(files)} CVE(s)...\n")
     for path in files:
         process_file(path)

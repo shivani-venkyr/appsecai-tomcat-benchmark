@@ -182,21 +182,6 @@ def main(cve_id: str, fixes_dir: Path, candidates_path: Path, benchmark_dir: Pat
     cve_dir.mkdir(parents=True, exist_ok=True)
     fixes_out_dir.mkdir(exist_ok=True)
 
-    # Write human_fix.md first — no dependency on PR lookup
-    after_blocks = parsed.get("after_blocks", [])
-    if not after_blocks:
-        print(f"  WARNING: no After code blocks found in {md_path.name} — human_fix.md will be empty")
-    if after_blocks:
-        block_parts = []
-        for block in after_blocks:
-            file_hdr = f"`{block['file']}`\n\n" if block["file"] else ""
-            block_parts.append(file_hdr + "```java\n" + "\n".join(block["lines"]) + "\n```")
-        human_fix_content = f"# {cve_id} — Human Fix\n\n" + "\n\n".join(block_parts) + "\n"
-    else:
-        human_fix_content = f"# {cve_id} — Human Fix\n\n```java\n\n```\n"
-    (cve_dir / "human_fix.md").write_text(human_fix_content, encoding="utf-8")
-    print(f"Wrote {cve_dir}/human_fix.md")
-
     # Find AppSecAI PR and write fix artifacts
     after_file = parsed.get("after_file") or None
     pr = find_appsecai_pr(cve_id, repo, file_path=after_file)
