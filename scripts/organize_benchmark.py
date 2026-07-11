@@ -154,14 +154,6 @@ def find_appsecai_pr(cve_id: str, repo: str, file_path: str | None = None) -> di
     return None
 
 
-def fetch_pr_diff(pr_number: int, repo: str) -> str:
-    result = subprocess.run(
-        ["gh", "pr", "diff", str(pr_number), "--repo", repo],
-        capture_output=True, text=True,
-    )
-    return result.stdout if result.returncode == 0 else ""
-
-
 def main(cve_id: str, fixes_dir: Path, candidates_path: Path, benchmark_dir: Path, repo: str, system_version: str | None = None) -> None:
     md_path = fixes_dir / f"{cve_id}_before_after.md"
     if not md_path.exists():
@@ -187,13 +179,6 @@ def main(cve_id: str, fixes_dir: Path, candidates_path: Path, benchmark_dir: Pat
     pr = find_appsecai_pr(cve_id, repo, file_path=after_file)
     if pr:
         pr_number = pr["number"]
-        diff = fetch_pr_diff(pr_number, repo)
-
-        if diff:
-            (fixes_out_dir / f"pr_{pr_number}.diff").write_text(diff, encoding="utf-8")
-            print(f"Wrote {fixes_out_dir}/pr_{pr_number}.diff")
-        else:
-            print(f"  WARNING: gh pr diff returned empty for PR #{pr_number} — diff not written")
 
         # Preserve council block and human_verdict if verdict already exists
         verdict_path = fixes_out_dir / f"pr_{pr_number}_verdict.json"
