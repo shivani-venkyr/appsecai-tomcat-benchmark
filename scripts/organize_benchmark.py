@@ -7,7 +7,7 @@ Structure produced:
         CVE-XXXX-XXXXX/
           metadata.json
           human_fix.md
-          appsec_fixes/
+          verdicts/
             pr_NN.diff
             pr_NN_verdict.json
 
@@ -170,7 +170,7 @@ def main(cve_id: str, fixes_dir: Path, candidates_path: Path, benchmark_dir: Pat
         candidate = {}
     # Create folder structure
     cve_dir = benchmark_dir / cwe / cve_id
-    fixes_out_dir = cve_dir / "appsec_fixes"
+    fixes_out_dir = cve_dir / "verdicts"
     cve_dir.mkdir(parents=True, exist_ok=True)
     fixes_out_dir.mkdir(exist_ok=True)
 
@@ -196,7 +196,7 @@ def main(cve_id: str, fixes_dir: Path, candidates_path: Path, benchmark_dir: Pat
         verdict_path.write_text(json.dumps(verdict, indent=2) + "\n", encoding="utf-8")
         print(f"Wrote {fixes_out_dir}/pr_{pr_number}_verdict.json")
     else:
-        print("No AppSecAI PR found — appsec_fixes/ left empty")
+        print("No AppSecAI PR found — verdicts/ left empty")
 
     # Write metadata.json after PR lookup so runs reflects the actual outcome.
     meta_path = cve_dir / "metadata.json"

@@ -4,7 +4,7 @@ Run Council of Experts on CVE comparison files.
 
 Calls claude and codex CLIs directly (no vendor library).
 Reads benchmark/**/all_fixes.md and updates
-benchmark/CWE/CVE/appsec_fixes/pr_NN_verdict.json with a council block.
+benchmark/CWE/CVE/verdicts/pr_NN_verdict.json with a council block.
 
 Usage:
     python3 scripts/run_council.py              # all CVEs
@@ -191,7 +191,7 @@ def extract_classification(answer: str) -> str:
 def already_judged(cve_dir: Path, pr_num: int | None) -> bool:
     if pr_num is None:
         return False
-    verdict_path = cve_dir / "appsec_fixes" / f"pr_{pr_num}_verdict.json"
+    verdict_path = cve_dir / "verdicts" / f"pr_{pr_num}_verdict.json"
     if not verdict_path.exists():
         return False
     return "council" in json.loads(verdict_path.read_text())
@@ -200,7 +200,7 @@ def already_judged(cve_dir: Path, pr_num: int | None) -> bool:
 def update_verdict(cve_dir: Path, pr_num: int | None, council_result: dict, run_date: str) -> None:
     if pr_num is None:
         return
-    verdict_path = cve_dir / "appsec_fixes" / f"pr_{pr_num}_verdict.json"
+    verdict_path = cve_dir / "verdicts" / f"pr_{pr_num}_verdict.json"
     verdict_path.parent.mkdir(parents=True, exist_ok=True)
     if verdict_path.exists():
         verdict = json.loads(verdict_path.read_text())
