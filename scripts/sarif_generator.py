@@ -1,6 +1,8 @@
-import re
-import json
 import argparse
+import json
+import re
+import subprocess
+import tempfile
 from pathlib import Path
 
 
@@ -252,9 +254,20 @@ def build_sarif(cve_data: dict, start_line: int, end_line: int, snippet_lines: l
     }
 
 
+def _get_vulnerable_content(tomcat_dir: Path, file_path: str, fix_commit: str) -> str | None:
+    """Return the file content at fix_commit^ (the vulnerable state), or None on failure."""
+    result = subprocess.run(
+        ["git", "show", f"{fix_commit}^:{file_path}"],
+        capture_output=True, text=True,
+        cwd=tomcat_dir,
+    )
+    return result.stdout if result.returncode == 0 else None
+
+
 def main(fixes_dir: Path, sarif_dir: Path, cve_ids: list[str] | None = None) -> None:
     sarif_dir.mkdir(parents=True, exist_ok=True)
     base_dir = Path(__file__).parent.parent
+    tomcat_dir = base_dir / "tomcat"
 
     all_md_paths = sorted(fixes_dir.glob("CVE-*_before_after.md"))
     if cve_ids:
@@ -270,32 +283,52 @@ def main(fixes_dir: Path, sarif_dir: Path, cve_ids: list[str] | None = None) -> 
             continue
         cve_id = cve_data["cve_id"]
 
-        src_file = base_dir / cve_data["before_file_path"]
+        # Get the file at the vulnerable state (parent of the fix commit) so line
+        # numbers and snippets reflect the code AppSecAI needs to detect and fix.
+        fix_commit = cve_data["fix_commits"][0] if cve_data.get("fix_commits") else None
+        vulnerable_content = None
+        if fix_commit and tomcat_dir.is_dir():
+            vulnerable_content = _get_vulnerable_content(tomcat_dir, cve_data["before_file_path"], fix_commit)
+            if vulnerable_content:
+                print(f"  {cve_id}: source at {fix_commit}^")
+            else:
+                print(f"  WARN: {cve_id}: could not retrieve source at {fix_commit}^, falling back to current")
 
-        if cve_data.get("line_override"):
-            start_line = cve_data["line_override"]
+        # Use a tempfile with vulnerable content when available; fall back to the
+        # static copy in the repo root when not.
+        tmp_path = None
+        if vulnerable_content is not None:
+            tmp = tempfile.NamedTemporaryFile(mode='w', suffix='.java', delete=False, encoding='utf-8')
+            tmp.write(vulnerable_content)
+            tmp.close()
+            lookup_path = Path(tmp.name)
+            tmp_path = lookup_path
         else:
-            start_line = find_declaration_line(src_file, cve_data["grep_term"], cve_data["is_class"])
-            if start_line is None:
-                print(f"WARN: {cve_data['grep_term']!r} not found in {src_file}, using startLine=1")
-                start_line = 1
+            lookup_path = base_dir / cve_data["before_file_path"]
 
-        end_line = start_line + len(cve_data["before_lines"]) - 1
+        try:
+            if cve_data.get("line_override"):
+                start_line = cve_data["line_override"]
+            else:
+                start_line = find_declaration_line(lookup_path, cve_data["grep_term"], cve_data["is_class"])
+                if start_line is None:
+                    print(f"WARN: {cve_data['grep_term']!r} not found in {lookup_path}, using startLine=1")
+                    start_line = 1
 
-        # Resolve snippet and cap endLine against actual file content.
-        # When startLine is precise (>1): use actual file lines so snippet matches
-        # what AppSecAI reads from the committed source.
-        # When startLine=1 (fallback): keep fix-file Before lines so the snippet
-        # still describes the vulnerable code, but still cap endLine at file length.
-        snippet_lines = None
-        if src_file.exists():
-            actual_lines = src_file.read_text(encoding="utf-8", errors="replace").splitlines()
-            end_line = min(end_line, len(actual_lines))
-            end_line = max(end_line, start_line)  # SARIF requires endLine >= startLine
-            if start_line > 1:
-                candidate = actual_lines[start_line - 1 : end_line]
-                if candidate:  # guard against start_line beyond actual file length
-                    snippet_lines = candidate
+            end_line = start_line + len(cve_data["before_lines"]) - 1
+
+            snippet_lines = None
+            if lookup_path.exists():
+                actual_lines = lookup_path.read_text(encoding="utf-8", errors="replace").splitlines()
+                end_line = min(end_line, len(actual_lines))
+                end_line = max(end_line, start_line)  # SARIF requires endLine >= startLine
+                if start_line > 1:
+                    candidate = actual_lines[start_line - 1 : end_line]
+                    if candidate:
+                        snippet_lines = candidate
+        finally:
+            if tmp_path is not None:
+                tmp_path.unlink(missing_ok=True)
 
         sarif = build_sarif(cve_data, start_line, end_line, snippet_lines)
 
