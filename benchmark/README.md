@@ -26,5 +26,5 @@ To add a human verdict, append an entry to the `human_verdicts` array in the rel
 |---|---|---|
 | `name` | string | Reviewer's name. Leave as `""` to remain anonymous. |
 | `date` | string | ISO date: `YYYY-MM-DD` |
-| `classification` | string | `"Accepted"`, `"Rejected"`, or `"Partial"` |
+| `classification` | string | `"Accepted"` or `"Rejected"` |
 | `reasoning` | string | Free-text explanation of the verdict. |
