@@ -78,7 +78,7 @@ def main(cve_id: str, fixes_dir: Path, candidates_path: Path, benchmark_dir: Pat
     if pr:
         pr_number = pr["number"]
 
-        # Preserve council block and human_verdict if verdict already exists
+        # Preserve council block and human_verdicts if verdict already exists
         verdict_path = fixes_out_dir / f"pr_{pr_number}_verdict.json"
         existing_verdict = json.loads(verdict_path.read_text(encoding="utf-8")) if verdict_path.exists() else {}
         verdict: dict = {
@@ -86,7 +86,7 @@ def main(cve_id: str, fixes_dir: Path, candidates_path: Path, benchmark_dir: Pat
             "pr_url": pr["url"],
             "run_date": date.today().isoformat(),
             "system_version": system_version,
-            "human_verdict": existing_verdict.get("human_verdict"),
+            "human_verdicts": existing_verdict.get("human_verdicts", []),
         }
         if "council" in existing_verdict:
             verdict["council"] = existing_verdict["council"]
