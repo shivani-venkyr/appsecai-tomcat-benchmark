@@ -52,7 +52,7 @@ def _detect_language(after_blocks: list[dict]) -> str:
     return "Unknown"
 
 
-def main(cve_id: str, fixes_dir: Path, candidates_path: Path, benchmark_dir: Path, repo: str, system_version: str | None = None) -> None:
+def main(cve_id: str, fixes_dir: Path, candidates_path: Path, benchmark_dir: Path, repo: str, system_version: str | None = None, run_time: str | None = None) -> None:
     md_path = fixes_dir / f"{cve_id}_before_after.md"
     if not md_path.exists():
         print(f"ERROR: {md_path} not found", file=sys.stderr)
@@ -115,6 +115,8 @@ def main(cve_id: str, fixes_dir: Path, candidates_path: Path, benchmark_dir: Pat
         "system_version": system_version,
         "pr_found": pr is not None,
     }
+    if run_time:
+        new_run["run_time"] = run_time
     if pr is not None:
         new_run["pr_number"] = pr["number"]
     metadata = {
@@ -144,5 +146,6 @@ if __name__ == "__main__":
     parser.add_argument("--benchmark-dir", type=Path, default=Path("benchmark"))
     parser.add_argument("--repo", default="AppSecureAI/appsecai-tomcat-benchmark")
     parser.add_argument("--system-version", default=None)
+    parser.add_argument("--run-time", default=None, help="ISO 8601 UTC timestamp when the workflow was triggered")
     args = parser.parse_args()
-    main(args.cve_id, args.fixes_dir, args.candidates, args.benchmark_dir, args.repo, args.system_version)
+    main(args.cve_id, args.fixes_dir, args.candidates, args.benchmark_dir, args.repo, args.system_version, args.run_time)

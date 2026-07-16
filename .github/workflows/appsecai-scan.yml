@@ -37,6 +37,10 @@ jobs:
           npm install -g @anthropic-ai/claude-code
           npm install -g @openai/codex
 
+      - name: Capture run time
+        id: run-time
+        run: echo "run_time=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> $GITHUB_OUTPUT
+
       - name: Capture AppSecAI system version
         id: version
         run: |
@@ -169,6 +173,7 @@ jobs:
               --benchmark-dir benchmark \
               --repo "${{ github.repository }}" \
               --system-version "${{ steps.version.outputs.system_version }}" \
+              --run-time "${{ steps.run-time.outputs.run_time }}" \
               || echo "WARNING: organize_benchmark failed for $cve, continuing"
           done
 
