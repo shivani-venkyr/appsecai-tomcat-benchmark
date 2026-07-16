@@ -39,7 +39,7 @@ jobs:
 
       - name: Capture run time
         id: run-time
-        run: echo "run_time=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> $GITHUB_OUTPUT
+        run: echo "run_time=$(date -u +%H:%M:%SZ)" >> $GITHUB_OUTPUT
 
       - name: Capture AppSecAI system version
         id: version

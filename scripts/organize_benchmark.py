@@ -85,9 +85,11 @@ def main(cve_id: str, fixes_dir: Path, candidates_path: Path, benchmark_dir: Pat
             "pr_number": pr_number,
             "pr_url": pr["url"],
             "run_date": date.today().isoformat(),
-            "system_version": system_version,
-            "human_verdicts": existing_verdict.get("human_verdicts", []),
         }
+        if run_time:
+            verdict["run_time"] = run_time
+        verdict["system_version"] = system_version
+        verdict["human_verdicts"] = existing_verdict.get("human_verdicts", [])
         if "council" in existing_verdict:
             verdict["council"] = existing_verdict["council"]
         verdict_path.write_text(json.dumps(verdict, indent=2) + "\n", encoding="utf-8")
@@ -99,24 +101,22 @@ def main(cve_id: str, fixes_dir: Path, candidates_path: Path, benchmark_dir: Pat
         while (fixes_out_dir / f"run_{today}_{counter}_verdict.json").exists():
             counter += 1
         missed_path = fixes_out_dir / f"run_{today}_{counter}_verdict.json"
-        missed_verdict = {
-            "run_date": today,
-            "system_version": system_version,
-            "classification": "Missed",
-        }
+        missed_verdict: dict = {"run_date": today}
+        if run_time:
+            missed_verdict["run_time"] = run_time
+        missed_verdict["system_version"] = system_version
+        missed_verdict["classification"] = "Missed"
         missed_path.write_text(json.dumps(missed_verdict, indent=2) + "\n", encoding="utf-8")
         print(f"Wrote {missed_path}")
 
     # Write metadata.json after PR lookup so runs reflects the actual outcome.
     meta_path = cve_dir / "metadata.json"
     existing_meta = json.loads(meta_path.read_text(encoding="utf-8")) if meta_path.exists() else {}
-    new_run: dict = {
-        "run_date": date.today().isoformat(),
-        "system_version": system_version,
-        "pr_found": pr is not None,
-    }
+    new_run: dict = {"run_date": date.today().isoformat()}
     if run_time:
         new_run["run_time"] = run_time
+    new_run["system_version"] = system_version
+    new_run["pr_found"] = pr is not None
     if pr is not None:
         new_run["pr_number"] = pr["number"]
     metadata = {
