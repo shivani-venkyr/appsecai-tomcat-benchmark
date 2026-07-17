@@ -8,7 +8,7 @@ on:
         required: false
         default: ''
       use_scraper:
-        description: 'Scrape tomcat.apache.org for new CVEs before running (ignored if cve_id is set)'
+        description: 'Scrape tomcat.apache.org for new CVEs before running. Has no effect if cve_id is filled in — explicit CVE IDs always take priority.'
         type: boolean
         default: false
 
