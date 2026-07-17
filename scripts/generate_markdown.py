@@ -171,7 +171,7 @@ Changing to `parameterCount >= limit` with a post-increment enforces the boundar
 
 def call_claude(prompt: str) -> str:
     proc = subprocess.run(
-        ["claude", "-p", "--model", "claude-sonnet-4-6", "--tools", ""],
+        ["claude", "-p", "--model", "claude-sonnet-4-6"],
         input=prompt, capture_output=True, text=True, timeout=600,
     )
     if proc.returncode != 0:
