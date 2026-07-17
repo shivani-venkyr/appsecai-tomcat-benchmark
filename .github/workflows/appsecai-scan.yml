@@ -4,9 +4,13 @@ on:
   workflow_dispatch:
     inputs:
       cve_id:
-        description: 'CVE(s) to run — single ID or comma-separated list (e.g. CVE-2023-28709,CVE-2024-38286). Leave blank to run all unsubmitted CVEs.'
+        description: 'CVE(s) to run — single ID or comma-separated list (e.g. CVE-2023-28709,CVE-2024-38286). Leave blank to run all pending CVEs.'
         required: false
         default: ''
+      use_scraper:
+        description: 'Scrape tomcat.apache.org for new CVEs before running (ignored if cve_id is set)'
+        type: boolean
+        default: false
 
 concurrency:
   group: appsecai-scan
@@ -49,10 +53,20 @@ jobs:
           echo "system_version=$VERSION" >> $GITHUB_OUTPUT
           echo "AppSecAI system version: $VERSION"
 
+      - name: Scrape new CVEs
+        if: inputs.use_scraper == true && inputs.cve_id == ''
+        run: |
+          python scripts/scrape_candidates.py \
+            --fixes-dir fixes \
+            --benchmark-dir benchmark \
+            --limit 100 \
+            --out cve_candidates.json
+
       - name: Determine CVEs to process
         id: resolve-cves
         env:
           CVE_INPUT: ${{ inputs.cve_id }}
+          USE_SCRAPER: ${{ inputs.use_scraper }}
         run: |
           python3 - <<'PYEOF'
           import json
@@ -65,7 +79,14 @@ jobs:
           from list_pending_cves import list_pending_cves
 
           CVE_RE = re.compile(r'^CVE-\d{4}-\d+$')
+          CVE_LIMIT = 100
+
           raw_input = os.environ.get('CVE_INPUT', '').strip()
+          use_scraper = os.environ.get('USE_SCRAPER', 'false').lower() == 'true'
+
+          if raw_input and use_scraper:
+              print("WARNING: both use_scraper and cve_id provided — ignoring use_scraper, using cve_id")
+              use_scraper = False
 
           if raw_input:
               cves = [c.strip() for c in raw_input.split(',') if c.strip()]
@@ -85,8 +106,30 @@ jobs:
                               print(f"WARNING: {cve_id} already has a complete benchmark entry — re-running may create a duplicate AppSecAI PR")
                       except Exception:
                           pass
+          elif use_scraper:
+              # Include CVEs from cve_candidates.json that have no fixes/ markdown yet
+              # (newly scraped) plus existing pending ones (fixes/ exists but no PR).
+              pending = list_pending_cves(Path('fixes'), Path('benchmark'))
+              new_from_candidates = []
+              candidates_path = Path('cve_candidates.json')
+              if candidates_path.exists():
+                  try:
+                      candidates = json.loads(candidates_path.read_text(encoding='utf-8'))
+                      existing_fixes = {
+                          p.name.replace('_before_after.md', '')
+                          for p in Path('fixes').glob('CVE-*_before_after.md')
+                      }
+                      new_from_candidates = [
+                          c['cve_id'] for c in candidates
+                          if c['cve_id'] not in existing_fixes
+                      ]
+                  except Exception as exc:
+                      print(f"WARNING: could not read cve_candidates.json: {exc}", file=sys.stderr)
+              cves = sorted(set(pending + new_from_candidates))[:CVE_LIMIT]
+              if len(pending) + len(new_from_candidates) > CVE_LIMIT:
+                  print(f"NOTE: {len(pending) + len(new_from_candidates)} CVEs available; capped at {CVE_LIMIT}")
           else:
-              cves = list_pending_cves(Path('fixes'), Path('benchmark'))
+              cves = list_pending_cves(Path('fixes'), Path('benchmark'))[:CVE_LIMIT]
 
           if not cves:
               print("No CVEs to process.")
@@ -217,7 +260,7 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git fetch origin main
           git rebase --autostash origin/main
-          git add fixes/ sarif/ benchmark/
+          git add fixes/ sarif/ benchmark/ cve_candidates.json
           N=$(echo "$CVE_LIST" | tr ',' '\n' | wc -l | tr -d ' ')
           git diff --cached --quiet || git commit -m "chore: pipeline run for ${N} CVE(s) [skip ci]"
           git push

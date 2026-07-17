@@ -1,12 +1,20 @@
 """
-Scrape Tomcat security pages and output cve_candidates.json.
+Scrape Tomcat security pages and merge results into cve_candidates.json.
 
 Fetches security-10.html and security-11.html, extracts CVEs from 2023
-onwards, deduplicates by CVE ID, and skips any CVE that already has a
-fixes/ markdown file.
+onwards, deduplicates by CVE ID, and skips CVEs that:
+  - already have a fixes/ markdown file, OR
+  - already have a complete benchmark entry (latest run has pr_found=True)
+
+Existing entries in cve_candidates.json are preserved; new entries are
+merged in rather than overwriting the file.
 
 Usage:
-    python scripts/scrape_candidates.py [--fixes-dir fixes] [--out cve_candidates.json]
+    python scripts/scrape_candidates.py \
+        [--fixes-dir fixes] \
+        [--benchmark-dir benchmark] \
+        [--limit 100] \
+        [--out cve_candidates.json]
 """
 
 import argparse
@@ -22,6 +30,7 @@ PAGES = [
 ]
 CUTOFF_YEAR = 2023
 SEVERITY_MAP = {"Important": "High"}  # Apache uses Important; we use High
+SEVERITY_ORDER = {"Critical": 0, "High": 1, "Moderate": 2, "Low": 3}
 
 
 def fetch(url: str) -> str:
@@ -92,12 +101,42 @@ def parse_page(html: str, tomcat_version: str) -> list[dict]:
     return cves
 
 
-def main(fixes_dir: Path, out_path: Path) -> None:
-    existing = {p.stem.split("_")[0] for p in fixes_dir.glob("CVE-*_before_after.md")}
-    print(f"Existing CVEs (will skip): {sorted(existing)}")
+def _load_completed_from_benchmark(benchmark_dir: Path) -> set[str]:
+    """Return CVE IDs whose latest benchmark run has pr_found=True."""
+    completed = set()
+    for meta_path in benchmark_dir.glob("*/CVE-*/metadata.json"):
+        try:
+            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+            runs = meta.get("runs", [])
+            if runs and runs[-1].get("pr_found", False):
+                completed.add(meta_path.parent.name)
+        except Exception:
+            pass
+    return completed
 
-    all_cves: dict[str, dict] = {}  # keyed by CVE ID for dedup
 
+def main(fixes_dir: Path, out_path: Path, benchmark_dir: Path | None = None, limit: int = 100) -> None:
+    has_fix = {p.stem.split("_")[0] for p in fixes_dir.glob("CVE-*_before_after.md")}
+    print(f"CVEs with existing fixes/ markdown: {len(has_fix)}")
+
+    completed_in_benchmark: set[str] = set()
+    if benchmark_dir is not None and benchmark_dir.exists():
+        completed_in_benchmark = _load_completed_from_benchmark(benchmark_dir)
+        print(f"CVEs completed in benchmark (pr_found=True): {len(completed_in_benchmark)}")
+
+    skip = has_fix | completed_in_benchmark
+
+    # Load existing candidates to preserve manual edits and avoid data loss
+    existing_by_id: dict[str, dict] = {}
+    if out_path.exists():
+        try:
+            for entry in json.loads(out_path.read_text(encoding="utf-8")):
+                existing_by_id[entry["cve_id"]] = entry
+        except Exception as exc:
+            print(f"WARNING: could not load {out_path}: {exc}", file=sys.stderr)
+
+    # Scrape fresh data
+    scraped_by_id: dict[str, dict] = {}
     for url, version in PAGES:
         print(f"Fetching {url} ...")
         html = fetch(url)
@@ -106,38 +145,67 @@ def main(fixes_dir: Path, out_path: Path) -> None:
 
         for entry in found:
             cid = entry["cve_id"]
-            if cid in all_cves:
+            if cid in scraped_by_id:
                 # Merge commit SHAs from both pages (backport commits differ)
-                existing_commits = all_cves[cid]["fix_commits"]
+                existing_commits = scraped_by_id[cid]["fix_commits"]
                 for sha in entry["fix_commits"]:
                     if sha not in existing_commits:
                         existing_commits.append(sha)
-                # Keep a record that this CVE appears on both major versions
-                all_cves[cid].setdefault("also_tomcat_version", []).append(version)
+                scraped_by_id[cid].setdefault("also_tomcat_version", []).append(version)
             else:
-                all_cves[cid] = entry
+                scraped_by_id[cid] = entry
 
-    candidates = []
+    # Merge scraped data into existing records
     skipped = []
-    for cve_id, entry in sorted(all_cves.items()):
-        if cve_id in existing:
+    no_commits = []
+    merged: dict[str, dict] = {}
+
+    for cve_id, scraped in sorted(scraped_by_id.items()):
+        if cve_id in skip:
             skipped.append(cve_id)
             continue
-        if not entry["fix_commits"]:
+        if not scraped["fix_commits"]:
             print(f"  WARN: {cve_id} has no commit links — skipping")
+            no_commits.append(cve_id)
             continue
-        candidates.append(entry)
 
-    print(f"\nSkipped (already have fixes/): {skipped}")
-    print(f"New candidates: {len(candidates)}")
+        if cve_id in existing_by_id:
+            # Preserve existing record; merge in any new commit SHAs only
+            record = dict(existing_by_id[cve_id])
+            existing_commits = record.get("fix_commits", [])
+            for sha in scraped["fix_commits"]:
+                if sha not in existing_commits:
+                    existing_commits.append(sha)
+            record["fix_commits"] = existing_commits
+            merged[cve_id] = record
+        else:
+            merged[cve_id] = scraped
 
-    out_path.write_text(json.dumps(candidates, indent=2, ensure_ascii=False), encoding="utf-8")
+    # Sort by fix_year desc, then severity, then CVE ID
+    candidates = sorted(
+        merged.values(),
+        key=lambda x: (-x.get("fix_year", 0), SEVERITY_ORDER.get(x.get("severity", ""), 99), x["cve_id"]),
+    )
+
+    if limit > 0 and len(candidates) > limit:
+        print(f"Applying limit: keeping top {limit} of {len(candidates)} candidates")
+        candidates = candidates[:limit]
+
+    print(f"\nSkipped (already processed): {len(skipped)}")
+    print(f"New candidates written: {len(candidates)}")
+
+    out_path.write_text(json.dumps(candidates, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     print(f"Wrote {out_path}")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--fixes-dir", type=Path, default=Path("fixes"))
+    parser.add_argument("--benchmark-dir", type=Path, default=Path("benchmark"),
+                        help="Path to benchmark dir for completed-CVE dedup (pass empty string to disable)")
+    parser.add_argument("--limit", type=int, default=100,
+                        help="Max candidates to write (0 = unlimited, default 100)")
     parser.add_argument("--out", type=Path, default=Path("cve_candidates.json"))
     args = parser.parse_args()
-    main(args.fixes_dir, args.out)
+    benchmark_dir = args.benchmark_dir if str(args.benchmark_dir) else None
+    main(args.fixes_dir, args.out, benchmark_dir, args.limit)
