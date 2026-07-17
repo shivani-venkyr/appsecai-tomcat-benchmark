@@ -1,1 +1,16 @@
-[]
+[
+  {
+    "cve_id": "CVE-2023-41080",
+    "severity": "Moderate",
+    "short_description": "Open redirect",
+    "fix_commits": [
+      "e3703c9abb8fe0d5602f6ba8a8f11d4b6940815a",
+      "bb4624a9f3e69d495182ebfa68d7983076407a27"
+    ],
+    "fix_year": 2023,
+    "tomcat_version": "11",
+    "also_tomcat_version": [
+      "10"
+    ]
+  }
+]
