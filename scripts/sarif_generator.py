@@ -121,11 +121,11 @@ def parse_markdown(path: Path) -> dict:
                     m = re.match(r'`([^`]+\.java)`', line)
                     if m:
                         before_file_path = m.group(1)
-                    elif re.match(r'^```\w', line.strip()):
+                    elif re.match(r'^```', line.strip()) and before_file_path:
                         state = "IN_BEFORE_CODE"
 
             elif state == "IN_BEFORE_CODE":
-                if line.strip() == "```":
+                if re.match(r'^```\s*$', line.strip()):
                     before_captured = True
                     state = "SCANNING_BEFORE"  # go back — multi-file Before or ## After may follow
                 else:
@@ -135,7 +135,7 @@ def parse_markdown(path: Path) -> dict:
                 m = re.match(r'`([^`]+\.java)`', line)
                 if m:
                     after_file_path = m.group(1)
-                elif re.match(r'^```\w', line.strip()):
+                elif re.match(r'^```', line.strip()) and after_file_path:
                     state = "IN_AFTER_CODE"
 
             elif state == "IN_AFTER_CODE":
