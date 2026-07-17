@@ -69,7 +69,8 @@ PROMPT_TEMPLATE = """\
 You are a security engineer writing a CVE fix documentation file for an AppSecAI benchmark.
 
 ## Your task
-Analyze the git diff below and produce a `fixes/{cve_id}_before_after.md` file documenting the vulnerability and its fix.
+Analyze the git diff below and output a markdown document documenting the vulnerability and its fix.
+Output ONLY raw markdown. No file paths, no tool calls, no commentary outside the markdown.
 
 ## CVE Metadata
 - CVE ID: {cve_id}
@@ -170,7 +171,7 @@ Changing to `parameterCount >= limit` with a post-increment enforces the boundar
 
 def call_claude(prompt: str) -> str:
     proc = subprocess.run(
-        ["claude", "-p", "--model", "claude-sonnet-4-6"],
+        ["claude", "-p", "--model", "claude-sonnet-4-6", "--tools", ""],
         input=prompt, capture_output=True, text=True, timeout=600,
     )
     if proc.returncode != 0:
