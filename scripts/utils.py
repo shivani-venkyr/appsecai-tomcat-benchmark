@@ -13,9 +13,10 @@ def parse_fix_markdown(md_path: Path) -> dict:
 
     Returns a dict with keys:
       cve_id, cwe, cwe_full, cwe_description, severity, d1_score,
-      affected_component, after_blocks, after_file
+      affected_component, before_blocks, after_blocks, after_file
     """
     data = {}
+    before_blocks: list[dict] = []
     after_blocks: list[dict] = []
     current_file = ""
     current_lines: list[str] = []
@@ -44,8 +45,34 @@ def parse_fix_markdown(md_path: Path) -> dict:
                         data["d1_score"] = int(d1_m.group(1)) if d1_m else 0
                     elif field == "Affected Component":
                         data["affected_component"] = re.sub(r'`', '', value).strip()
+                elif line.startswith("## Before"):
+                    state = "SCAN_BEFORE_PATH"
                 elif line.startswith("## After"):
                     state = "SCAN_AFTER_PATH"
+
+            elif state == "SCAN_BEFORE_PATH":
+                stripped = line.strip()
+                if stripped.startswith("## After"):
+                    current_file = ""
+                    state = "SCAN_AFTER_PATH"
+                elif stripped.startswith("## ") and not stripped.startswith("## Before"):
+                    break
+                else:
+                    m = re.match(r'^`([^`]+\.java)`', stripped)
+                    if m:
+                        current_file = m.group(1)
+                    elif re.match(r'^```', stripped) and current_file:
+                        current_lines = []
+                        state = "IN_BEFORE"
+
+            elif state == "IN_BEFORE":
+                if line.strip() == "```":
+                    before_blocks.append({"file": current_file, "lines": current_lines})
+                    current_file = ""
+                    current_lines = []
+                    state = "SCAN_BEFORE_PATH"
+                else:
+                    current_lines.append(line)
 
             elif state == "SCAN_AFTER_PATH":
                 stripped = line.strip()
@@ -69,6 +96,7 @@ def parse_fix_markdown(md_path: Path) -> dict:
                 else:
                     current_lines.append(line)
 
+    data["before_blocks"] = before_blocks
     data["after_blocks"] = after_blocks
     data["after_file"] = after_blocks[0]["file"] if after_blocks else ""
     return data

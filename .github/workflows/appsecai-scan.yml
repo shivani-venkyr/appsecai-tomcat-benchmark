@@ -11,6 +11,10 @@ on:
         description: 'Scrape tomcat.apache.org for new CVEs before running. Has no effect if cve_id is filled in — explicit CVE IDs always take priority.'
         type: boolean
         default: false
+      scrape_limit:
+        description: 'Max CVEs to scrape and process (1–100). Only applies when use_scraper is enabled. Values below 1 are treated as 1; values above 100 are capped at 100.'
+        required: false
+        default: '100'
 
 concurrency:
   group: appsecai-scan
@@ -24,6 +28,9 @@ permissions:
 jobs:
   analyze:
     runs-on: ubuntu-latest
+    env:
+      AUTO_CREATE_PRS: 'true'
+      PROCESSING_MODE: group_cc
 
     steps:
       - name: Checkout repository
@@ -54,12 +61,26 @@ jobs:
           echo "AppSecAI system version: $VERSION"
 
       - name: Scrape new CVEs
+        id: scrape
         if: inputs.use_scraper == true && inputs.cve_id == ''
+        env:
+          RAW_LIMIT: ${{ inputs.scrape_limit }}
         run: |
+          RAW="${RAW_LIMIT:-100}"
+          if ! [[ "$RAW" =~ ^[0-9]+$ ]]; then
+            echo "ERROR: scrape_limit must be a number between 1 and 100 (got: '$RAW')" >&2
+            exit 1
+          fi
+          LIMIT=$(( RAW ))
+          if (( LIMIT < 1 || LIMIT > 100 )); then
+            echo "ERROR: scrape_limit must be between 1 and 100 (got: $LIMIT)" >&2
+            exit 1
+          fi
+          echo "Scraping up to $LIMIT CVE(s)"
           python scripts/scrape_candidates.py \
             --fixes-dir fixes \
             --benchmark-dir benchmark \
-            --limit 100 \
+            --limit "$LIMIT" \
             --out cve_candidates.json
 
       - name: Determine CVEs to process
@@ -67,6 +88,8 @@ jobs:
         env:
           CVE_INPUT: ${{ inputs.cve_id }}
           USE_SCRAPER: ${{ inputs.use_scraper }}
+          SCRAPE_LIMIT: ${{ inputs.scrape_limit }}
+          NEWLY_SCRAPED: ${{ steps.scrape.outputs.newly_scraped }}
         run: |
           python3 - <<'PYEOF'
           import json
@@ -79,10 +102,14 @@ jobs:
           from list_pending_cves import list_pending_cves
 
           CVE_RE = re.compile(r'^CVE-\d{4}-\d+$')
-          CVE_LIMIT = 100
 
           raw_input = os.environ.get('CVE_INPUT', '').strip()
           use_scraper = os.environ.get('USE_SCRAPER', 'false').lower() == 'true'
+
+          try:
+              cve_limit = max(1, min(100, int(os.environ.get('SCRAPE_LIMIT', '') or 100)))
+          except ValueError:
+              cve_limit = 10
 
           if raw_input and use_scraper:
               print("WARNING: both use_scraper and cve_id provided — ignoring use_scraper, using cve_id")
@@ -93,6 +120,25 @@ jobs:
               invalid = [c for c in cves if not CVE_RE.match(c)]
               if invalid:
                   print(f"ERROR: invalid CVE ID format: {invalid}", file=sys.stderr)
+                  sys.exit(1)
+              # Load candidate IDs for validation
+              candidates_path = Path('cve_candidates.json')
+              try:
+                  candidate_ids = {c['cve_id'] for c in json.loads(candidates_path.read_text(encoding='utf-8'))}
+              except Exception:
+                  candidate_ids = set()
+              # Drop CVEs that have neither a fixes/ markdown nor a candidates entry
+              valid = []
+              for cve_id in cves:
+                  has_markdown = (Path('fixes') / f"{cve_id}_before_after.md").exists()
+                  in_candidates = cve_id in candidate_ids
+                  if has_markdown or in_candidates:
+                      valid.append(cve_id)
+                  else:
+                      print(f"WARNING: {cve_id} has no fixes/ markdown and is not in cve_candidates.json — skipping")
+              cves = valid
+              if not cves:
+                  print("ERROR: all specified CVE IDs were invalid or not found in fixes/ or cve_candidates.json", file=sys.stderr)
                   sys.exit(1)
               # Warn if any CVE already has a complete benchmark entry
               meta_index = {p.parent.name: p for p in Path('benchmark').glob('*/CVE-*/metadata.json')}
@@ -107,8 +153,11 @@ jobs:
                       except Exception:
                           pass
           elif use_scraper:
-              # Include CVEs from cve_candidates.json that have no fixes/ markdown yet
-              # (newly scraped) plus existing pending ones (fixes/ exists but no PR).
+              newly_scraped_raw = os.environ.get('NEWLY_SCRAPED', '').strip()
+              cves = sorted(set(c for c in newly_scraped_raw.split(',') if c.strip()))
+              if not cves:
+                  print("NOTE: scraper found no new CVEs this run")
+          else:
               pending = list_pending_cves(Path('fixes'), Path('benchmark'))
               new_from_candidates = []
               candidates_path = Path('cve_candidates.json')
@@ -125,11 +174,9 @@ jobs:
                       ]
                   except Exception as exc:
                       print(f"WARNING: could not read cve_candidates.json: {exc}", file=sys.stderr)
-              cves = sorted(set(pending + new_from_candidates))[:CVE_LIMIT]
-              if len(pending) + len(new_from_candidates) > CVE_LIMIT:
-                  print(f"NOTE: {len(pending) + len(new_from_candidates)} CVEs available; capped at {CVE_LIMIT}")
-          else:
-              cves = list_pending_cves(Path('fixes'), Path('benchmark'))[:CVE_LIMIT]
+              cves = sorted(set(pending + new_from_candidates))[:100]
+              if len(pending) + len(new_from_candidates) > 100:
+                  print(f"NOTE: {len(pending) + len(new_from_candidates)} CVEs available; capped at 100")
 
           if not cves:
               print("No CVEs to process.")
@@ -163,6 +210,108 @@ jobs:
             fi
           done
 
+      - name: Fetch Tomcat source files for AppSecAI and SARIF line numbers
+        if: steps.resolve-cves.outputs.has_cves == 'true'
+        env:
+          CVE_LIST: ${{ steps.resolve-cves.outputs.cve_list }}
+        run: |
+          python3 - <<'PYEOF'
+          import json
+          import os
+          import re
+          import subprocess
+          from pathlib import Path
+
+          cve_list = [c for c in os.environ['CVE_LIST'].split(',') if c]
+
+          # Collect full SHAs per CVE from cve_candidates.json
+          shas_by_cve = {}
+          candidates_path = Path('cve_candidates.json')
+          if candidates_path.exists():
+              try:
+                  candidates = {c['cve_id']: c for c in json.loads(candidates_path.read_text(encoding='utf-8'))}
+                  for cve_id in cve_list:
+                      commits = [s for s in candidates.get(cve_id, {}).get('fix_commits', []) if s]
+                      if commits:
+                          shas_by_cve[cve_id] = commits
+              except Exception as e:
+                  print(f"WARNING: could not read cve_candidates.json: {e}")
+
+          all_shas = {sha for shas in shas_by_cve.values() for sha in shas}
+          if not all_shas:
+              print("No fix commits found — skipping Tomcat fetch")
+              raise SystemExit(0)
+
+          print(f"Fetching {len(all_shas)} commit(s) from apache/tomcat")
+
+          tomcat_dir = Path('tomcat')
+          tomcat_dir.mkdir(exist_ok=True)
+          subprocess.run(['git', 'init', '--bare'], cwd=tomcat_dir, check=True, capture_output=True)
+          subprocess.run(
+              ['git', 'remote', 'add', 'origin', 'https://github.com/apache/tomcat.git'],
+              cwd=tomcat_dir, check=True, capture_output=True,
+          )
+
+          failed_shas = set()
+          for sha in sorted(all_shas):
+              print(f"  fetching {sha[:8]} ...")
+              result = subprocess.run(
+                  ['git', 'fetch', '--depth=2', 'origin', sha],
+                  cwd=tomcat_dir, capture_output=True, text=True,
+              )
+              if result.returncode != 0:
+                  print(f"  WARNING: could not fetch {sha[:8]}: {result.stderr.strip()[:120]}")
+                  failed_shas.add(sha)
+
+          # Write the vulnerable file content to the repo so AppSecAI has a source
+          # file to read and patch. Also used by sarif_generator for line numbers.
+          files_written = 0
+          for cve_id in cve_list:
+              md_path = Path('fixes') / f'{cve_id}_before_after.md'
+              if not md_path.exists():
+                  continue
+
+              # Parse the before_file_path — first .java path after ## Before
+              before_file = None
+              in_before = False
+              for line in md_path.read_text(encoding='utf-8').splitlines():
+                  stripped = line.strip()
+                  if stripped.startswith('## Before'):
+                      in_before = True
+                  elif stripped.startswith('## After') or stripped.startswith('## Explanation'):
+                      break
+                  elif in_before:
+                      m = re.match(r'`([^`]+\.java)`', stripped)
+                      if m:
+                          before_file = m.group(1)
+                          break
+
+              if not before_file:
+                  print(f"  WARNING: {cve_id}: could not determine source file from markdown")
+                  continue
+
+              sha = next((s for s in shas_by_cve.get(cve_id, []) if s not in failed_shas), None)
+              if not sha:
+                  print(f"  WARNING: {cve_id}: no usable fix commit — skipping file write")
+                  continue
+
+              result = subprocess.run(
+                  ['git', 'show', f'{sha}^:{before_file}'],
+                  cwd=tomcat_dir, capture_output=True, text=True,
+              )
+              if result.returncode != 0:
+                  print(f"  WARNING: {cve_id}: could not retrieve {before_file} at {sha[:8]}^")
+                  continue
+
+              out_path = Path(before_file)
+              out_path.parent.mkdir(parents=True, exist_ok=True)
+              out_path.write_text(result.stdout, encoding='utf-8')
+              files_written += 1
+              print(f"  {cve_id}: wrote {before_file}")
+
+          print(f"Wrote {files_written} vulnerable source file(s)")
+          PYEOF
+
       - name: Generate SARIF files
         if: steps.resolve-cves.outputs.has_cves == 'true'
         env:
@@ -188,12 +337,26 @@ jobs:
           missing = set(all_files) - set(files)
           if missing:
               print(f"WARNING: {len(missing)} SARIF file(s) not found (skipping): {sorted(missing)}")
+          if not files:
+              print("ERROR: no SARIF files were generated — cannot run AppSecAI action", file=__import__('sys').stderr)
+              raise SystemExit(1)
           with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
               f.write("sarif_files<<EOF\n")
               f.write("\n".join(files) + "\n")
               f.write("EOF\n")
           print(f"SARIF files ({len(files)}): {files}")
           PYEOF
+
+      - name: Commit vulnerable source files to repo
+        if: steps.resolve-cves.outputs.has_cves == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          git rebase --autostash origin/main
+          git add java/ 2>/dev/null || true
+          git diff --cached --quiet || git commit -m "chore: add vulnerable source files for AppSecAI run [skip ci]"
+          git push
 
       - name: AppSecAI Vulnerability Analysis
         if: steps.resolve-cves.outputs.has_cves == 'true'

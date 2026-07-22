@@ -13,6 +13,7 @@ Usage:
 """
 
 import argparse
+import difflib
 import re
 import subprocess
 import sys
@@ -74,18 +75,25 @@ def process_cve(cve_id: str, fixes_dir: Path, benchmark_dir: Path, repo: str) ->
     java_diff = filter_java_diff(diff)
     cve_dir = find_cve_dir(cve_id, cwe, benchmark_dir)
 
-    # Render all After blocks (handles fixes touching multiple files)
+    # Render human fix as unified diff (before → after) per file
     after_blocks = data.get("after_blocks", [])
+    before_blocks = data.get("before_blocks", [])
     if not after_blocks:
         print(f"  {cve_id}: WARNING — no After code blocks found; human fix section will be empty")
-    if after_blocks:
-        human_fix_parts = []
-        for block in after_blocks:
-            file_hdr = f"`{block['file']}`\n\n" if block["file"] else ""
-            human_fix_parts.append(file_hdr + "```java\n" + "\n".join(block["lines"]) + "\n```")
-        human_fix_section = "\n\n".join(human_fix_parts)
-    else:
-        human_fix_section = "```java\n\n```"
+    before_by_file = {b["file"]: b["lines"] for b in before_blocks}
+    human_fix_parts = []
+    for block in after_blocks:
+        fname = block["file"]
+        before_lines = before_by_file.get(fname, [])
+        after_lines = block["lines"]
+        diff_lines = list(difflib.unified_diff(
+            before_lines, after_lines,
+            fromfile=f"a/{fname}", tofile=f"b/{fname}",
+            lineterm="",
+        ))
+        if diff_lines:
+            human_fix_parts.append("```diff\n" + "\n".join(diff_lines) + "\n```")
+    human_fix_section = "\n\n".join(human_fix_parts) if human_fix_parts else "```diff\n\n```"
 
     ai_fix_section = f"## AI Fix (AppSecAI PR #{pr_number})\n\n```diff\n{java_diff}\n```\n"
     out_path = cve_dir / "all_fixes.md"

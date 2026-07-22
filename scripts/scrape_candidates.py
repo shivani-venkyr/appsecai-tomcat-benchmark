@@ -1,13 +1,15 @@
 """
-Scrape Tomcat security pages and merge results into cve_candidates.json.
+Scrape Tomcat security pages and append new CVEs to cve_candidates.json.
 
 Fetches security-10.html and security-11.html, extracts CVEs from 2023
-onwards, deduplicates by CVE ID, and skips CVEs that:
+onwards, and adds CVEs that are not already in cve_candidates.json,
+skipping those that:
+  - are already in cve_candidates.json, OR
   - already have a fixes/ markdown file, OR
   - already have a complete benchmark entry (latest run has pr_found=True)
 
-Existing entries in cve_candidates.json are preserved; new entries are
-merged in rather than overwriting the file.
+Existing entries in cve_candidates.json are always preserved as-is.
+--limit controls how many new CVEs are added, not the total file size.
 
 Usage:
     python scripts/scrape_candidates.py \
@@ -19,6 +21,7 @@ Usage:
 
 import argparse
 import json
+import os
 import re
 import sys
 from pathlib import Path
@@ -155,12 +158,16 @@ def main(fixes_dir: Path, out_path: Path, benchmark_dir: Path | None = None, lim
             else:
                 scraped_by_id[cid] = entry
 
-    # Merge scraped data into existing records
+    # Find CVEs that are new — scraped from Tomcat but not already in the file.
+    # Existing entries are always preserved as-is; the limit only applies to
+    # how many new CVEs are added this run.
     skipped = []
     no_commits = []
-    merged: dict[str, dict] = {}
+    new_entries: list[dict] = []
 
     for cve_id, scraped in sorted(scraped_by_id.items()):
+        if cve_id in existing_by_id:
+            continue  # already in the file, leave it untouched
         if cve_id in skip:
             skipped.append(cve_id)
             continue
@@ -168,34 +175,27 @@ def main(fixes_dir: Path, out_path: Path, benchmark_dir: Path | None = None, lim
             print(f"  WARN: {cve_id} has no commit links — skipping")
             no_commits.append(cve_id)
             continue
+        new_entries.append(scraped)
 
-        if cve_id in existing_by_id:
-            # Preserve existing record; merge in any new commit SHAs only
-            record = dict(existing_by_id[cve_id])
-            existing_commits = record.get("fix_commits", [])
-            for sha in scraped["fix_commits"]:
-                if sha not in existing_commits:
-                    existing_commits.append(sha)
-            record["fix_commits"] = existing_commits
-            merged[cve_id] = record
-        else:
-            merged[cve_id] = scraped
-
-    # Sort by fix_year desc, then severity, then CVE ID
-    candidates = sorted(
-        merged.values(),
+    # Sort new entries by recency/severity then apply limit
+    new_entries.sort(
         key=lambda x: (-x.get("fix_year", 0), SEVERITY_ORDER.get(x.get("severity", ""), 99), x["cve_id"]),
     )
+    if limit > 0 and len(new_entries) > limit:
+        print(f"Applying limit: adding {limit} of {len(new_entries)} new CVEs found")
+        new_entries = new_entries[:limit]
 
-    if limit > 0 and len(candidates) > limit:
-        print(f"Applying limit: keeping top {limit} of {len(candidates)} candidates")
-        candidates = candidates[:limit]
+    # Preserve all existing entries + append new ones
+    existing_entries = list(existing_by_id.values())
+    candidates = existing_entries + new_entries
 
     print(f"\nSkipped (already processed): {len(skipped)}")
-    print(f"New candidates written: {len(candidates)}")
+    print(f"Existing entries preserved: {len(existing_entries)}")
+    print(f"New CVEs added: {len(new_entries)}")
 
     out_path.write_text(json.dumps(candidates, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     print(f"Wrote {out_path}")
+    return [e["cve_id"] for e in new_entries]
 
 
 if __name__ == "__main__":
@@ -208,4 +208,8 @@ if __name__ == "__main__":
     parser.add_argument("--out", type=Path, default=Path("cve_candidates.json"))
     args = parser.parse_args()
     benchmark_dir = args.benchmark_dir if str(args.benchmark_dir) else None
-    main(args.fixes_dir, args.out, benchmark_dir, args.limit)
+    new_ids = main(args.fixes_dir, args.out, benchmark_dir, args.limit)
+    github_output = os.environ.get("GITHUB_OUTPUT")
+    if github_output:
+        with open(github_output, "a") as f:
+            f.write(f"newly_scraped={','.join(new_ids)}\n")

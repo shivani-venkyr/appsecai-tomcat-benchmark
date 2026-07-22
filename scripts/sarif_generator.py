@@ -6,7 +6,7 @@ import tempfile
 from pathlib import Path
 
 
-LEVEL_MAP = {"Low": "note", "Moderate": "warning", "High": "error"}
+LEVEL_MAP = {"Low": "note", "Moderate": "warning", "High": "error", "Critical": "error", "Important": "error"}
 
 
 def _parse_affected_component(raw: str) -> dict:
@@ -321,11 +321,11 @@ def main(fixes_dir: Path, sarif_dir: Path, cve_ids: list[str] | None = None) -> 
             if lookup_path.exists():
                 actual_lines = lookup_path.read_text(encoding="utf-8", errors="replace").splitlines()
                 end_line = min(end_line, len(actual_lines))
-                end_line = max(end_line, start_line)  # SARIF requires endLine >= startLine
                 if start_line > 1:
                     candidate = actual_lines[start_line - 1 : end_line]
                     if candidate:
                         snippet_lines = candidate
+            end_line = max(end_line, start_line)  # SARIF requires endLine >= startLine
         finally:
             if tmp_path is not None:
                 tmp_path.unlink(missing_ok=True)

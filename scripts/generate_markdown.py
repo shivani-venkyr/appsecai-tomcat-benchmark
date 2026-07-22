@@ -16,6 +16,9 @@ import sys
 import tempfile
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).parent))
+from sarif_generator import parse_markdown as _validate_markdown
+
 D1_THRESHOLDS = [10, 50, 200, 500]
 
 
@@ -185,13 +188,23 @@ def main(
     fixes_dir: Path,
     tomcat_repo: str,
 ) -> None:
-    candidates = json.loads(candidates_path.read_text(encoding="utf-8"))
+    if not candidates_path.exists():
+        print(f"ERROR: {candidates_path} not found", file=sys.stderr)
+        sys.exit(1)
+    try:
+        candidates = json.loads(candidates_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        print(f"ERROR: could not read {candidates_path}: {exc}", file=sys.stderr)
+        sys.exit(1)
     entry = next((c for c in candidates if c["cve_id"] == cve_id), None)
     if entry is None:
         print(f"ERROR: {cve_id} not found in {candidates_path}", file=sys.stderr)
         sys.exit(1)
 
     shas = entry["fix_commits"]
+    if not shas:
+        print(f"ERROR: {cve_id} has no fix_commits in {candidates_path}", file=sys.stderr)
+        sys.exit(1)
     diff_parts = []
     total_lines = 0
     for sha in shas:
@@ -227,6 +240,18 @@ def main(
 
     print("Calling Claude API ...")
     markdown = call_claude(prompt)
+
+    # Validate before writing — catch malformed output (e.g. unclosed code blocks)
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False, encoding="utf-8") as tmp:
+        tmp.write(markdown)
+        tmp_path = Path(tmp.name)
+    try:
+        _validate_markdown(tmp_path)
+    except Exception as exc:
+        print(f"ERROR: Claude output for {cve_id} failed validation — not writing file: {exc}", file=sys.stderr)
+        sys.exit(1)
+    finally:
+        tmp_path.unlink(missing_ok=True)
 
     fixes_dir.mkdir(parents=True, exist_ok=True)
     out_path = fixes_dir / f"{cve_id}_before_after.md"

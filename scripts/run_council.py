@@ -257,6 +257,8 @@ def process_file(path: Path) -> None:
     cve_dir = path.parent
     for fix in ai_fixes:
         pr_num = fix["pr_num"]
+        if pr_num is None:
+            continue
         if already_judged(cve_dir, pr_num):
             print(f"  {meta['cve_id']}{fix['pr_label']} ... already judged, skipping")
             continue

@@ -61,7 +61,11 @@ def main(cve_id: str, fixes_dir: Path, candidates_path: Path, benchmark_dir: Pat
     parsed = parse_fix_markdown(md_path)
     cwe = parsed.get("cwe", "CWE-UNKNOWN")
 
-    candidates = json.loads(candidates_path.read_text(encoding="utf-8"))
+    try:
+        candidates = json.loads(candidates_path.read_text(encoding="utf-8"))
+    except (FileNotFoundError, json.JSONDecodeError) as e:
+        print(f"  WARNING: could not read {candidates_path} ({e}) — candidate fields will be empty")
+        candidates = []
     candidate = next((c for c in candidates if c["cve_id"] == cve_id), None)
     if candidate is None:
         print(f"  WARNING: {cve_id} not found in {candidates_path} — candidate fields will be empty")
